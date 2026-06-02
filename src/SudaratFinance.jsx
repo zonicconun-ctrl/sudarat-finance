@@ -185,9 +185,8 @@ function calcPayslip(m, bonusData) {
   return { ot, gross, deductions, net, workDays, leaveCount, actualMeal, actualDiligence, quarterlyBonusAmt };
 }
 
-function calcTaxForMonth(m, months) {
+function calcTaxForMonth(m, _months) {
   const { net } = calcPayslip(m, {});
-  const monthsCount = months.length || 1;
   const annualEst = net * 12;
   const personalDeduction = 60000;
   const employmentDeduction = Math.min(annualEst * 0.5, 100000);
@@ -247,7 +246,6 @@ function WorkCalendarTab({ month, onChange }) {
 
   const leaveCount = sickDays + personalDays;
   const actualMeal = (workDays + otHolidayDays) * (month.mealRatePerDay || 0);
-  const actualDiligence = leaveCount > 0 ? 0 : (month.diligenceBonus || 0);
 
   const TYPE_CYCLE = [null, "holiday", "sick", "personal"];
 
@@ -415,46 +413,6 @@ function MiniBar({ value, max, color }) {
   );
 }
 
-function StatCard({ label, value, sub, color = "#378ADD", icon }) {
-  return (
-    <div style={{
-      background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12,
-      padding: "14px 16px", display: "flex", flexDirection: "column", gap: 4
-    }}>
-      <div style={{ fontSize: 12, color: "var(--text2)", display: "flex", alignItems: "center", gap: 5 }}>
-        {icon && <span>{icon}</span>}{label}
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text1)", letterSpacing: "-0.5px" }}>
-        ฿{fmt(value)}
-      </div>
-      {sub && <div style={{ fontSize: 11, color: "var(--text3)" }}>{sub}</div>}
-    </div>
-  );
-}
-
-function BarChart({ months, dataKey, color, height = 80 }) {
-  const values = months.map(m => {
-    if (dataKey === "income") return calcPayslip(m, {}).net;
-    if (dataKey === "expense") return Object.values(m.expenses || {}).reduce((a, b) => a + (+b || 0), 0);
-    if (dataKey === "saving") return Object.values(m.savings || {}).reduce((a, b) => a + (+b || 0), 0);
-    return 0;
-  });
-  const max = Math.max(...values, 1);
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height }}>
-      {values.map((v, i) => (
-        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-          <div style={{
-            width: "100%", borderRadius: "3px 3px 0 0",
-            height: Math.max(3, (v / max) * (height - 18)),
-            background: color, opacity: 0.85, transition: "height 0.3s"
-          }} title={`฿${fmt(v)}`} />
-          <div style={{ fontSize: 9, color: "var(--text3)" }}>{MONTHS[months[i].monthIdx]}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 const YEAR_COLORS = ["#378ADD", "#1D9E75", "#EF9F27", "#7F77DD", "#D85A30"];
 
@@ -512,7 +470,6 @@ function Dashboard({ months, year, allYears = [], allMonths = [] }) {
   const prevYearStat = yearStats.length >= 2 ? yearStats[yearStats.length - 2] : null;
   const curYearStat = yearStats.find(s => s.year === year) || yearStats[yearStats.length - 1];
   const yoyNet = prevYearStat && curYearStat ? ((curYearStat.avgNet - prevYearStat.avgNet) / prevYearStat.avgNet) * 100 : null;
-  const yoySalary = prevYearStat && curYearStat ? ((curYearStat.avgSalary - prevYearStat.avgSalary) / prevYearStat.avgSalary) * 100 : null;
 
   // ── Multi-year bar chart data ──
   const chartMax = Math.max(...allSorted.map(m => {
@@ -1728,7 +1685,6 @@ function LoginScreen({ user, darkMode, onLogin, onBack }) {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [shake, setShake] = useState(false);
-  const inputRef = useState(null);
 
   function handleLogin() {
     if (!user.password || password === user.password) {
@@ -2328,22 +2284,6 @@ function DataBackupSection({ onExport, onImport }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────
-
-const EXCEL_DATA = [
-  {"monthIdx":0,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":0,"ot15":16,"ot2":0,"ot3":0,"foodAllowance":360,"bonus":1200,"sso":875,"providentFund":2171.2642,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":2500,"travel":0,"other":0},"savings":{"kept":6526.72,"oomssin":0,"krungthai":1631.68,"sp500":0,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":1,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":0,"ot15":30,"ot2":0,"ot3":0,"foodAllowance":690,"bonus":4250,"sso":875,"providentFund":3101.806,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":2500,"travel":0,"other":0},"savings":{"kept":5000,"oomssin":0,"krungthai":1133.91,"sp500":0,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":2,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":16,"ot15":20,"ot2":0,"ot3":3,"foodAllowance":600,"bonus":3000,"sso":875,"providentFund":1240.7224,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":2500,"travel":5000,"other":0},"savings":{"kept":3000,"oomssin":0,"krungthai":5113.64,"sp500":0,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":3,"hourlyRate":135.8333,"baseSalary":32600,"ot1":0,"ot15":18,"ot2":0,"ot3":0,"foodAllowance":0,"bonus":1250,"sso":750,"providentFund":2782,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2900,"suda":0,"travel":6000,"other":0},"savings":{"kept":3398.55,"oomssin":1000,"krungthai":3489.95,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":4,"hourlyRate":135.704,"baseSalary":32568.96,"ot1":8,"ot15":24,"ot2":0,"ot3":2.5,"foodAllowance":0,"bonus":1200,"sso":875,"providentFund":3256.896,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":2500,"travel":0,"other":4000},"savings":{"kept":3662.58,"oomssin":1000,"krungthai":2866.24,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":5,"hourlyRate":135.704,"baseSalary":32568.96,"ot1":24,"ot15":18,"ot2":0,"ot3":0,"foodAllowance":630,"bonus":0,"sso":750,"providentFund":2279.8272,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":1500,"travel":2500,"other":0},"savings":{"kept":3709,"oomssin":1000,"krungthai":6284.03,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":6,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":0,"ot15":0,"ot2":0,"ot3":0,"foodAllowance":0,"bonus":0,"sso":750,"providentFund":2171.2642,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":3000,"suda":1500,"travel":2500,"other":0},"savings":{"kept":2809.68,"oomssin":1000,"krungthai":0,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":7,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":0,"ot15":0,"ot2":0,"ot3":0,"foodAllowance":0,"bonus":0,"sso":750,"providentFund":2171.2642,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":1500,"travel":2500,"other":0},"savings":{"kept":2809.68,"oomssin":1000,"krungthai":0,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":8,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":0,"ot15":0,"ot2":0,"ot3":0,"foodAllowance":0,"bonus":0,"sso":750,"providentFund":2171.2642,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":1500,"travel":2500,"other":0},"savings":{"kept":2809.68,"oomssin":1000,"krungthai":0,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":9,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":0,"ot15":0,"ot2":0,"ot3":0,"foodAllowance":0,"bonus":0,"sso":750,"providentFund":2171.2642,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":3000,"suda":1500,"travel":2500,"other":0},"savings":{"kept":2809.68,"oomssin":1000,"krungthai":0,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":10,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":0,"ot15":0,"ot2":0,"ot3":0,"foodAllowance":0,"bonus":0,"sso":750,"providentFund":2171.2642,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":1500,"travel":2500,"other":0},"savings":{"kept":2809.68,"oomssin":1000,"krungthai":0,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""},
-  {"monthIdx":11,"hourlyRate":129.2419,"baseSalary":31018.06,"ot1":0,"ot15":0,"ot2":0,"ot3":0,"foodAllowance":0,"bonus":0,"sso":875,"providentFund":2171.2642,"expenses":{"daily":10000,"vivy":3000,"rent":5500,"ais":1300,"youtube":200,"disney":97,"shopping":2000,"suda":1500,"travel":2500,"other":0},"savings":{"kept":2809.68,"oomssin":1000,"krungthai":0,"sp500":1500,"gold_orn":0,"gold_bar":0},"notes":""}
-];
 
 function MainApp({ user, darkMode, setDarkMode, onLogout, onEditProfile }) {
   const storageKey    = userStorageKey(user.id);

@@ -13,7 +13,14 @@
       "Bash(pip3 install *)",
       "Bash(gh auth *)",
       "Bash(npm --version)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(npm install *)",
+      "Bash(sudo npm install -g vercel)",
+      "Bash(npx vercel *)",
+      "Bash(~/.local/bin/vercel --version)",
+      "Bash(npx --yes vercel --version)",
+      "Bash(jobs -l)",
+      "Bash(npm run *)"
     ]
   }
 }
