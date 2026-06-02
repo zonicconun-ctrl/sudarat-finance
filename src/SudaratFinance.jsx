@@ -185,16 +185,6 @@ function calcPayslip(m, bonusData) {
   return { ot, gross, deductions, net, workDays, leaveCount, actualMeal, actualDiligence, quarterlyBonusAmt };
 }
 
-function calcTaxForMonth(m, _months) {
-  const { net } = calcPayslip(m, {});
-  const annualEst = net * 12;
-  const personalDeduction = 60000;
-  const employmentDeduction = Math.min(annualEst * 0.5, 100000);
-  const ssoDeductionAnnual = (m.sso || 0) * 12;
-  const taxable = Math.max(0, annualEst - personalDeduction - employmentDeduction - ssoDeductionAnnual);
-  const annualTax = calcTax(taxable);
-  return { annualTax, monthlyTaxProvision: annualTax / 12, taxable, annualEst };
-}
 
 const TABS = [
   { id: "dashboard",   label: "ภาพรวม",   icon: "📊" },
