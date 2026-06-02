@@ -2206,8 +2206,17 @@ function SettingsTab({ settings, onChange, onExport, onImport }) {
 
 function DataBackupSection({ onExport, onImport }) {
   const fileRef = useRef(null);
-  const [status, setStatus] = useState(null); // null | "ok" | "err"
+  const [status, setStatus] = useState(() =>
+    sessionStorage.getItem("importSuccess") ? "ok" : null
+  );
   const [errMsg, setErrMsg] = useState("");
+
+  useEffect(() => {
+    if (sessionStorage.getItem("importSuccess")) {
+      sessionStorage.removeItem("importSuccess");
+      setTimeout(() => setStatus(null), 4000);
+    }
+  }, []);
 
   function handleImportFile(e) {
     const file = e.target.files?.[0];
@@ -2218,9 +2227,8 @@ function DataBackupSection({ onExport, onImport }) {
         const data = JSON.parse(ev.target.result);
         if (!data.months || !Array.isArray(data.months)) throw new Error("ไฟล์ไม่ถูกต้อง");
         onImport(data);
-        setStatus("ok");
-        // Reload page so all state picks up new data from localStorage
-        setTimeout(() => window.location.reload(), 1200);
+        sessionStorage.setItem("importSuccess", "1");
+        window.location.reload();
       } catch (err) {
         setErrMsg(err.message || "ไฟล์ไม่ถูกต้อง");
         setStatus("err");
