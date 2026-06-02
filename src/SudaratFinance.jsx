@@ -2219,7 +2219,8 @@ function DataBackupSection({ onExport, onImport }) {
         if (!data.months || !Array.isArray(data.months)) throw new Error("ไฟล์ไม่ถูกต้อง");
         onImport(data);
         setStatus("ok");
-        setTimeout(() => setStatus(null), 3000);
+        // Reload page so all state picks up new data from localStorage
+        setTimeout(() => window.location.reload(), 1200);
       } catch (err) {
         setErrMsg(err.message || "ไฟล์ไม่ถูกต้อง");
         setStatus("err");
