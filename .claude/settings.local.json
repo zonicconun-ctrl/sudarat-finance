@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/sudarat.s/sudarat-finance/.claude)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(sleep 8 && tail -20 /tmp/cra-dev.log)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000/static/js/bundle.js)",
+      "Bash(npx react-scripts *)",
+      "Read(//Users/sudarat.s/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/4b53e530-b262-44a6-b1b5-30b5a9a9a49a/c2f04e69-dc7d-41d5-95d1-27c42c1aeefb/skills/xlsx/**)",
+      "Bash(extract-text \"/Users/sudarat.s/Downloads/Sudarat S.-2.xlsx\")",
+      "Bash(python3 -c ' *)",
+      "Bash(pip3 install *)",
+      "Bash(gh auth *)",
+      "Bash(npm --version)",
+      "Bash(npm list *)"
+    ]
+  }
+}
