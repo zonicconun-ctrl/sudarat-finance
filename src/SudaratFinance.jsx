@@ -131,6 +131,20 @@ function getQuarterlyBonusForMonth(monthIdx, bonusData) {
   return null;
 }
 
+// ─── Bonus data year-key migration ─────────────────────────
+function isBonusYearKeyed(data) {
+  return data && Object.keys(data).some(k => /^\d{4}$/.test(k));
+}
+function migrateBonusData(data) {
+  if (!data || isBonusYearKeyed(data)) return data || {};
+  const year = new Date().getFullYear();
+  return { [year]: data };
+}
+function getBonusForYear(bonusData, year) {
+  if (isBonusYearKeyed(bonusData)) return bonusData[year] || {};
+  return bonusData || {};
+}
+
 function calcWorkDays(m) {
   const year = m.year || 2026;
   const daysInMonth = new Date(year, m.monthIdx + 1, 0).getDate();
@@ -170,7 +184,8 @@ function calcPayslip(m, bonusData) {
   const actualDiligence = leaveCount > 0 ? 0 : (m.diligenceBonus || 0);
 
   // โบนัสรายไตรมาส
-  const qBonus = getQuarterlyBonusForMonth(m.monthIdx, bonusData);
+  const yearBonus = getBonusForYear(bonusData, m.year || new Date().getFullYear());
+  const qBonus = getQuarterlyBonusForMonth(m.monthIdx, yearBonus);
   const quarterlyBonusAmt = qBonus?.amount || 0;
 
   const ot = (m.ot1 || 0) * m.hourlyRate
@@ -188,6 +203,7 @@ function calcPayslip(m, bonusData) {
 
 const TABS = [
   { id: "dashboard",   label: "ภาพรวม",   icon: "📊" },
+  { id: "summary",     label: "สรุปเดือน", icon: "📋" },
   { id: "payslip",     label: "เงินเดือน", icon: "💵" },
   { id: "calendar",    label: "ปฏิทิน",   icon: "🗓" },
   { id: "ot",          label: "OT",        icon: "⏰" },
@@ -1155,7 +1171,113 @@ const ANNUAL_EXPENSE_CATS = [
   { key: "other_annual", label: "อื่นๆ ประจำปี", icon: "📦", default: 0 },
 ];
 
-function BonusTab({ bonusData, onChange }) {
+// ─── Summary Tab ───────────────────────────────────────────
+function SummaryTab({ month, bonusData }) {
+  const { ot, gross, deductions, net, actualMeal, actualDiligence, quarterlyBonusAmt } = calcPayslip(month, bonusData);
+  const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
+  const remaining = net - totalExpenses;
+  const totalSavings = SAVINGS_CATS.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
+  const afterSavings = remaining - totalSavings;
+
+  const SectionHeader = ({ icon, label }) => (
+    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+      <span>{icon}</span><span>{label}</span>
+    </div>
+  );
+  const Row = ({ label, value, color, bold, border }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: border !== false ? "1px solid var(--border)" : "none" }}>
+      <span style={{ fontSize: 13, color: "var(--text2)", fontWeight: bold ? 600 : 400 }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: bold ? 700 : 500, color: color || "var(--text1)" }}>฿{fmt(value)}</span>
+    </div>
+  );
+  const TotalRow = ({ label, value, color }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0 0", marginTop: 4 }}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text1)" }}>{label}</span>
+      <span style={{ fontSize: 18, fontWeight: 800, color }}>{value >= 0 ? "" : "-"}฿{fmt(Math.abs(value))}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* รายรับ */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+        <SectionHeader icon="💰" label="รายรับเดือนนี้" />
+        <Row label="เงินเดือนพื้นฐาน" value={month.baseSalary || 0} />
+        {ot > 0 && <Row label="ค่า OT" value={ot} color="#EF9F27" />}
+        {actualMeal > 0 && <Row label="ค่าข้าว" value={actualMeal} />}
+        {actualDiligence > 0 && <Row label="เบี้ยขยัน" value={actualDiligence} />}
+        {(month.bonus || 0) > 0 && <Row label="โบนัส/พิเศษ" value={month.bonus} color="#7F77DD" />}
+        {quarterlyBonusAmt > 0 && <Row label="โบนัสรายไตรมาส" value={quarterlyBonusAmt} color="#1D9E75" />}
+        <TotalRow label="รายรับรวม (Gross)" value={gross} color="#1D9E75" />
+      </div>
+
+      {/* หัก */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+        <SectionHeader icon="📋" label="รายการหัก" />
+        {(month.sso || 0) > 0 && <Row label="ประกันสังคม" value={month.sso} color="#D85A30" />}
+        {(month.providentFund || 0) > 0 && <Row label="กองทุนสำรองเลี้ยงชีพ" value={month.providentFund} color="#D85A30" />}
+        <TotalRow label="รับสุทธิ (Net)" value={net} color="#378ADD" />
+      </div>
+
+      {/* รายจ่าย */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+        <SectionHeader icon="🧾" label="รายจ่ายเดือนนี้" />
+        {EXPENSE_CATS.map(c => {
+          const v = +(month.expenses?.[c.key] || 0);
+          if (!v) return null;
+          return <Row key={c.key} label={c.label} value={v} />;
+        })}
+        <TotalRow label="รายจ่ายรวม" value={totalExpenses} color="#D85A30" />
+      </div>
+
+      {/* คงเหลือ */}
+      <div style={{
+        background: remaining >= 0 ? "#E6F7F2" : "#FDEEE9",
+        border: `1px solid ${remaining >= 0 ? "#1D9E75" : "#D85A30"}`,
+        borderRadius: 12, padding: 16,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text1)" }}>💵 คงเหลือหลังหักค่าใช้จ่าย</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: remaining >= 0 ? "#1D9E75" : "#D85A30" }}>
+            {remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}
+          </span>
+        </div>
+      </div>
+
+      {/* ออม */}
+      {totalSavings > 0 && (
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+          <SectionHeader icon="🏦" label="แบ่งออม" />
+          {SAVINGS_CATS.map(c => {
+            const v = +(month.savings?.[c.key] || 0);
+            if (!v) return null;
+            return <Row key={c.key} label={c.label} value={v} color={c.color} />;
+          })}
+          <TotalRow label="ออมรวม" value={totalSavings} color="#378ADD" />
+          <div style={{
+            marginTop: 12, background: afterSavings >= 0 ? "#E6F1FB" : "#FDEEE9",
+            border: `1px solid ${afterSavings >= 0 ? "#378ADD" : "#D85A30"}`,
+            borderRadius: 8, padding: "10px 14px",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text1)" }}>🎯 เหลือใช้จ่ายเดือนนี้</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: afterSavings >= 0 ? "#378ADD" : "#D85A30" }}>
+              {afterSavings >= 0 ? "" : "-"}฿{fmt(Math.abs(afterSavings))}
+            </span>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+function BonusTab({ bonusData, onChange, allYears }) {
+  const years = allYears && allYears.length > 0 ? allYears : [new Date().getFullYear()];
+  const [selectedYear, setSelectedYear] = useState(years[years.length - 1]);
+  const yearData = getBonusForYear(bonusData, selectedYear);
+
   const quarters = [
     { key: "q1", label: "ไตรมาส 1 (ม.ค.–มี.ค.)", color: "#378ADD" },
     { key: "q2", label: "ไตรมาส 2 (เม.ย.–มิ.ย.)", color: "#1D9E75" },
@@ -1164,20 +1286,32 @@ function BonusTab({ bonusData, onChange }) {
   ];
 
   function set(key, val) {
-    onChange({ ...bonusData, [key]: +val || 0 });
+    onChange({ ...bonusData, [selectedYear]: { ...yearData, [key]: +val || 0 } });
   }
 
-  const totalQuarterly = quarters.reduce((a, q) => a + (+bonusData[q.key] || 0), 0);
-  const annualBonus = +bonusData.annual || 0;
-  const performanceBonus = +bonusData.performance || 0;
+  const totalQuarterly = quarters.reduce((a, q) => a + (+yearData[q.key] || 0), 0);
+  const annualBonus = +yearData.annual || 0;
+  const performanceBonus = +yearData.performance || 0;
   const totalBonus = totalQuarterly + annualBonus + performanceBonus;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
+      {/* Year selector */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {years.map(y => (
+          <button key={y} onClick={() => setSelectedYear(y)} style={{
+            padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
+            border: y === selectedYear ? "none" : "1px solid var(--border)",
+            background: y === selectedYear ? "#378ADD" : "var(--card-bg)",
+            color: y === selectedYear ? "#fff" : "var(--text2)",
+          }}>{y}</button>
+        ))}
+      </div>
+
       {/* Quarterly */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)", marginBottom: 12 }}>🗓 โบนัสรายไตรมาส</div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)", marginBottom: 12 }}>🗓 โบนัสรายไตรมาส {selectedYear}</div>
         {quarters.map(q => (
           <div key={q.key} style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1185,12 +1319,12 @@ function BonusTab({ bonusData, onChange }) {
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: q.color }} />
                 <label style={{ fontSize: 13, color: "var(--text2)" }}>{q.label}</label>
               </div>
-              <input type="number" value={bonusData[q.key] ?? ""}
+              <input type="number" value={yearData[q.key] ?? ""}
                 placeholder="0"
                 onChange={e => set(q.key, e.target.value)}
                 style={{ width: 120, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)" }} />
             </div>
-            <MiniBar value={+bonusData[q.key] || 0} max={Math.max(totalBonus, 1)} color={q.color} />
+            <MiniBar value={+yearData[q.key] || 0} max={Math.max(totalBonus, 1)} color={q.color} />
           </div>
         ))}
         <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 0", borderTop: "1px solid var(--border)", marginTop: 4 }}>
@@ -1212,7 +1346,7 @@ function BonusTab({ bonusData, onChange }) {
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: b.color }} />
               <label style={{ fontSize: 13, color: "var(--text2)" }}>{b.label}</label>
             </div>
-            <input type="number" value={bonusData[b.key] ?? ""}
+            <input type="number" value={yearData[b.key] ?? ""}
               placeholder="0"
               onChange={e => set(b.key, e.target.value)}
               style={{ width: 120, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)" }} />
@@ -1227,7 +1361,7 @@ function BonusTab({ bonusData, onChange }) {
           { label: "โบนัสรายไตรมาสรวม", v: totalQuarterly, color: "#378ADD" },
           { label: "โบนัสประจำปี", v: annualBonus, color: "#D85A30" },
           { label: "โบนัส Performance", v: performanceBonus, color: "#1D9E75" },
-          { label: "โบนัสอื่นๆ", v: +bonusData.other_bonus || 0, color: "#888780" },
+          { label: "โบนัสอื่นๆ", v: +yearData.other_bonus || 0, color: "#888780" },
         ].map(r => (
           <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--border)" }}>
             <span style={{ fontSize: 13, color: "var(--text2)" }}>{r.label}</span>
@@ -1247,7 +1381,7 @@ function BonusTab({ bonusData, onChange }) {
 
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
         <label style={{ fontSize: 12, color: "var(--text2)" }}>หมายเหตุ</label>
-        <textarea value={bonusData.notes || ""} onChange={e => onChange({ ...bonusData, notes: e.target.value })}
+        <textarea value={yearData.notes || ""} onChange={e => onChange({ ...bonusData, [selectedYear]: { ...yearData, notes: e.target.value } })}
           rows={2} placeholder="บันทึกเงื่อนไข หรือ KPI..."
           style={{ width: "100%", marginTop: 6, background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: "var(--text1)", resize: "vertical", boxSizing: "border-box" }} />
       </div>
@@ -2317,7 +2451,7 @@ function MainApp({ user, darkMode, setDarkMode, onLogout, onEditProfile }) {
   const [addingYear, setAddingYear] = useState(false);
   const [settings, setSettings] = useState(() => loadSettings(user.id));
   const [bonusData, setBonusData] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(bonusKey) || "{}"); } catch { return {}; }
+    try { return migrateBonusData(JSON.parse(localStorage.getItem(bonusKey) || "{}")); } catch { return {}; }
   });
   const [annualExp, setAnnualExp] = useState(() => {
     try { return JSON.parse(localStorage.getItem(annualKey) || "{}"); } catch { return {}; }
@@ -2656,6 +2790,7 @@ Use 0 for any price you can't find.`
             {/* Content */}
             <div style={{ padding: "0 16px" }}>
               {activeTab === "dashboard"  && <Dashboard months={yearMonths} year={selectedYear} allYears={allYears} allMonths={months} />}
+              {activeTab === "summary"   && (currentMonth ? <SummaryTab month={currentMonth} bonusData={bonusData} /> : <EmptyState icon="📋" />)}
               {activeTab === "payslip"   && (currentMonth ? <PayslipTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="📋" />)}
               {activeTab === "calendar"  && (currentMonth ? <WorkCalendarTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🗓" />)}
               {activeTab === "ot"        && (currentMonth ? <OTCalendarTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="⏰" />)}
@@ -2663,7 +2798,7 @@ Use 0 for any price you can't find.`
               {activeTab === "savings" && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🏦" />)}
               {activeTab === "investments" && <InvestmentsTab liveData={liveData} refreshLive={refreshLive} />}
               {activeTab === "tax"         && <TaxTab months={yearMonths} taxDeductions={taxDeductions} onChangeTaxDeductions={setTaxDeductions} />}
-              {activeTab === "bonus"       && <BonusTab bonusData={bonusData} onChange={setBonusData} />}
+              {activeTab === "bonus"       && <BonusTab bonusData={bonusData} onChange={setBonusData} allYears={allYears} />}
               {activeTab === "annual"      && <AnnualExpensesTab annualExp={annualExp} onChange={setAnnualExp} />}
               {activeTab === "settings"    && <SettingsTab
                 settings={settings}
