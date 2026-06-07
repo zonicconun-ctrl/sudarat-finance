@@ -95,11 +95,11 @@ function loadSettings(userId) {
 }
 
 // ─── Month defaults (ใช้ settings เป็น default) ─────────────
-function defaultMonth(monthIdx, year = 2026, settings = DEFAULT_SETTINGS) {
+function defaultMonth(monthIdx, year = 2026, settings = DEFAULT_SETTINGS, expCats = EXPENSE_CATS, savCats = SAVINGS_CATS) {
   const expenses = {};
-  EXPENSE_CATS.forEach(c => (expenses[c.key] = c.default));
+  expCats.forEach(c => (expenses[c.key] = c.default || 0));
   const savings = {};
-  SAVINGS_CATS.forEach(s => (savings[s.key] = 0));
+  savCats.forEach(s => (savings[s.key] = 0));
   return {
     year,
     monthIdx,
@@ -752,35 +752,107 @@ function PayslipTab({ month, onChange, bonusData = {} }) {
   );
 }
 
-function ExpensesTab({ month, onChange }) {
-  const total = EXPENSE_CATS.reduce((a, c) => a + (+month.expenses?.[c.key] || 0), 0);
+const CAT_COLORS = ["#378ADD","#1D9E75","#EF9F27","#D85A30","#7F77DD","#993556","#888780","#0F6E56","#185FA5","#E24B4A","#B8860B","#2E86AB"];
+
+function CatRow({ cat, value, max, onValue, onEdit, onDelete, inputStyle }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: cat.color, flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
+          <button onClick={onEdit} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "var(--text3)", padding: "0 2px", flexShrink: 0 }}>✏️</button>
+          <button onClick={onDelete} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#D85A30", padding: "0 2px", flexShrink: 0 }}>🗑</button>
+        </div>
+        <input type="number" value={value ?? 0} onChange={e => onValue(e.target.value)}
+          style={{ width: 110, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)", flexShrink: 0, ...inputStyle }} />
+      </div>
+      <MiniBar value={+value || 0} max={max} color={cat.color} />
+    </div>
+  );
+}
+
+function AddCatRow({ onAdd, placeholder = "ชื่อรายการใหม่" }) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  function confirm() {
+    if (name.trim()) { onAdd(name.trim()); setName(""); setAdding(false); }
+  }
+  if (!adding) return (
+    <button onClick={() => setAdding(true)} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1.5px dashed var(--border)", background: "transparent", color: "var(--text3)", fontSize: 13, cursor: "pointer", marginTop: 4 }}>
+      + เพิ่มรายการ
+    </button>
+  );
+  return (
+    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+      <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") confirm(); if (e.key === "Escape") setAdding(false); }}
+        placeholder={placeholder}
+        style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--input-bg)", fontSize: 13, color: "var(--text1)" }} />
+      <button onClick={confirm} style={{ padding: "6px 12px", borderRadius: 8, background: "#1D9E75", color: "#fff", border: "none", cursor: "pointer", fontSize: 13 }}>✓</button>
+      <button onClick={() => { setAdding(false); setName(""); }} style={{ padding: "6px 12px", borderRadius: 8, background: "var(--card-bg)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 13, color: "var(--text2)" }}>✗</button>
+    </div>
+  );
+}
+
+function EditCatModal({ cat, onSave, onClose }) {
+  const [label, setLabel] = useState(cat.label);
+  const [color, setColor] = useState(cat.color);
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 20, width: "100%", maxWidth: 320 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text1)", marginBottom: 14 }}>แก้ไขรายการ</div>
+        <input value={label} onChange={e => setLabel(e.target.value)} autoFocus
+          style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--input-bg)", fontSize: 14, color: "var(--text1)", marginBottom: 12, boxSizing: "border-box" }} />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+          {CAT_COLORS.map(c => (
+            <div key={c} onClick={() => setColor(c)} style={{ width: 24, height: 24, borderRadius: "50%", background: c, cursor: "pointer", border: c === color ? "3px solid var(--text1)" : "2px solid transparent" }} />
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => onSave(label.trim(), color)} style={{ flex: 1, padding: "10px", borderRadius: 10, background: "#378ADD", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>บันทึก</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 10, background: "var(--card-bg)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 13, color: "var(--text2)" }}>ยกเลิก</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExpensesTab({ month, onChange, expenseCats = EXPENSE_CATS, onUpdateExpCats }) {
+  const total = expenseCats.reduce((a, c) => a + (+month.expenses?.[c.key] || 0), 0);
   const { net } = calcPayslip(month, {});
+  const [editingCat, setEditingCat] = useState(null);
 
   function setExp(key, val) {
     onChange({ ...month, expenses: { ...month.expenses, [key]: +val || 0 } });
   }
+  function addCat(label) {
+    const key = "custom_" + Date.now();
+    const color = CAT_COLORS[expenseCats.length % CAT_COLORS.length];
+    onUpdateExpCats([...expenseCats, { key, label, color, default: 0 }]);
+  }
+  function deleteCat(key) {
+    onUpdateExpCats(expenseCats.filter(c => c.key !== key));
+  }
+  function saveEdit(key, label, color) {
+    onUpdateExpCats(expenseCats.map(c => c.key === key ? { ...c, label, color } : c));
+    setEditingCat(null);
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {editingCat && <EditCatModal cat={editingCat} onSave={(l, c) => saveEdit(editingCat.key, l, c)} onClose={() => setEditingCat(null)} />}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)" }}>รายการจ่าย</span>
           <span style={{ fontSize: 13, fontWeight: 500, color: "#D85A30" }}>รวม ฿{fmt(total)}</span>
         </div>
-        {EXPENSE_CATS.map(c => (
-          <div key={c.key} style={{ marginBottom: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />
-                <label style={{ fontSize: 13, color: "var(--text2)" }}>{c.label}</label>
-              </div>
-              <input type="number" value={month.expenses?.[c.key] ?? c.default}
-                onChange={e => setExp(c.key, e.target.value)}
-                style={{ width: 110, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)" }} />
-            </div>
-            <MiniBar value={+month.expenses?.[c.key] || 0} max={net} color={c.color} />
-          </div>
+        {expenseCats.map(c => (
+          <CatRow key={c.key} cat={c} value={month.expenses?.[c.key] ?? c.default ?? 0} max={net}
+            onValue={v => setExp(c.key, v)}
+            onEdit={() => setEditingCat(c)}
+            onDelete={() => deleteCat(c.key)} />
         ))}
+        {onUpdateExpCats && <AddCatRow onAdd={addCat} placeholder="เช่น ค่าไฟ, ค่าน้ำ..." />}
       </div>
 
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
@@ -805,17 +877,30 @@ function ExpensesTab({ month, onChange }) {
   );
 }
 
-function SavingsTab({ month, onChange, bonusData = {} }) {
-  const total = SAVINGS_CATS.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
+function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CATS, onUpdateSavCats }) {
+  const total = savingsCats.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
   const { net } = calcPayslip(month, bonusData);
   const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
   const remaining = net - totalExpenses;
   const afterSavings = remaining - total;
   const pct = net > 0 ? (total / net) * 100 : 0;
   const savingsPctOfRemaining = remaining > 0 ? (total / remaining) * 100 : 0;
+  const [editingCat, setEditingCat] = useState(null);
 
   function setSav(key, val) {
     onChange({ ...month, savings: { ...month.savings, [key]: +val || 0 } });
+  }
+  function addCat(label) {
+    const key = "custom_" + Date.now();
+    const color = CAT_COLORS[savingsCats.length % CAT_COLORS.length];
+    onUpdateSavCats([...savingsCats, { key, label, color }]);
+  }
+  function deleteCat(key) {
+    onUpdateSavCats(savingsCats.filter(c => c.key !== key));
+  }
+  function saveEdit(key, label, color) {
+    onUpdateSavCats(savingsCats.map(c => c.key === key ? { ...c, label, color } : c));
+    setEditingCat(null);
   }
 
   return (
@@ -838,25 +923,19 @@ function SavingsTab({ month, onChange, bonusData = {} }) {
         )}
       </div>
 
+      {editingCat && <EditCatModal cat={editingCat} onSave={(l, c) => saveEdit(editingCat.key, l, c)} onClose={() => setEditingCat(null)} />}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)" }}>บัญชีออมทรัพย์</span>
           <span style={{ fontSize: 13, fontWeight: 500, color: "#1D9E75" }}>฿{fmt(total)} ({fmtDec(savingsPctOfRemaining, 1)}% ของคงเหลือ)</span>
         </div>
-        {SAVINGS_CATS.map(c => (
-          <div key={c.key} style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />
-                <label style={{ fontSize: 13, color: "var(--text2)" }}>{c.label}</label>
-              </div>
-              <input type="number" value={month.savings?.[c.key] ?? 0}
-                onChange={e => setSav(c.key, e.target.value)}
-                style={{ width: 110, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)" }} />
-            </div>
-            <MiniBar value={+month.savings?.[c.key] || 0} max={net * 0.3} color={c.color} />
-          </div>
+        {savingsCats.map(c => (
+          <CatRow key={c.key} cat={c} value={month.savings?.[c.key] ?? 0} max={remaining > 0 ? remaining : net * 0.3}
+            onValue={v => setSav(c.key, v)}
+            onEdit={() => setEditingCat(c)}
+            onDelete={() => deleteCat(c.key)} />
         ))}
+        {onUpdateSavCats && <AddCatRow onAdd={addCat} placeholder="เช่น กองทุน RMF, เงินสำรอง..." />}
       </div>
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
         <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 6 }}>เป้าหมายการออม (จากคงเหลือ)</div>
@@ -1212,11 +1291,11 @@ const ANNUAL_EXPENSE_CATS = [
 ];
 
 // ─── Summary Tab ───────────────────────────────────────────
-function SummaryTab({ month, bonusData }) {
+function SummaryTab({ month, bonusData, expenseCats = EXPENSE_CATS, savingsCats = SAVINGS_CATS }) {
   const { ot, gross, deductions, net, actualMeal, actualDiligence, quarterlyBonusAmt } = calcPayslip(month, bonusData);
   const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
   const remaining = net - totalExpenses;
-  const totalSavings = SAVINGS_CATS.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
+  const totalSavings = savingsCats.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
   const afterSavings = remaining - totalSavings;
 
   const SectionHeader = ({ icon, label }) => (
@@ -1263,7 +1342,7 @@ function SummaryTab({ month, bonusData }) {
       {/* รายจ่าย */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
         <SectionHeader icon="🧾" label="รายจ่ายเดือนนี้" />
-        {EXPENSE_CATS.map(c => {
+        {expenseCats.map(c => {
           const v = +(month.expenses?.[c.key] || 0);
           if (!v) return null;
           return <Row key={c.key} label={c.label} value={v} />;
@@ -1289,7 +1368,7 @@ function SummaryTab({ month, bonusData }) {
       {totalSavings > 0 && (
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
           <SectionHeader icon="🏦" label="แบ่งออม" />
-          {SAVINGS_CATS.map(c => {
+          {savingsCats.map(c => {
             const v = +(month.savings?.[c.key] || 0);
             if (!v) return null;
             return <Row key={c.key} label={c.label} value={v} color={c.color} />;
@@ -2287,7 +2366,7 @@ function DeleteAccountButton({ user, darkMode, onDeleted }) {
 }
 
 // ─── Export / Import helpers ────────────────────────────────
-function exportUserData(user, months, bonusData, annualExp, taxDeductions, settings) {
+function exportUserData(user, months, bonusData, annualExp, taxDeductions, settings, expenseCats, savingsCats) {
   const payload = {
     exportedAt: new Date().toISOString(),
     exportedBy: user.name,
@@ -2298,6 +2377,8 @@ function exportUserData(user, months, bonusData, annualExp, taxDeductions, setti
     annualExp,
     taxDeductions,
     settings,
+    expenseCats,
+    savingsCats,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -2495,6 +2576,8 @@ function MainApp({ user, darkMode, setDarkMode, onLogout, onEditProfile }) {
   const bonusKey      = `sf_bonus_${user.id}`;
   const annualKey     = `sf_annual_${user.id}`;
   const taxDedKey     = `sf_taxded_${user.id}`;
+  const expCatKey     = `sf_expcats_${user.id}`;
+  const savCatKey     = `sf_savcats_${user.id}`;
 
   const [activeTab, setActiveTab] = useState("dashboard");
   const [months, setMonths] = useState(() => {
@@ -2531,6 +2614,12 @@ function MainApp({ user, darkMode, setDarkMode, onLogout, onEditProfile }) {
   const [taxDeductions, setTaxDeductions] = useState(() => {
     try { return JSON.parse(localStorage.getItem(taxDedKey) || "{}"); } catch { return {}; }
   });
+  const [expenseCats, setExpenseCats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(expCatKey) || "null") || EXPENSE_CATS; } catch { return EXPENSE_CATS; }
+  });
+  const [savingsCats, setSavingsCats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(savCatKey) || "null") || SAVINGS_CATS; } catch { return SAVINGS_CATS; }
+  });
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(months));
@@ -2539,11 +2628,13 @@ function MainApp({ user, darkMode, setDarkMode, onLogout, onEditProfile }) {
   useEffect(() => { localStorage.setItem(annualKey, JSON.stringify(annualExp)); },  [annualExp, annualKey]);
   useEffect(() => { localStorage.setItem(taxDedKey, JSON.stringify(taxDeductions)); }, [taxDeductions, taxDedKey]);
   useEffect(() => { localStorage.setItem(SETTINGS_KEY(user.id), JSON.stringify(settings)); }, [settings, user.id]);
+  useEffect(() => { localStorage.setItem(expCatKey, JSON.stringify(expenseCats)); }, [expenseCats, expCatKey]);
+  useEffect(() => { localStorage.setItem(savCatKey, JSON.stringify(savingsCats)); }, [savingsCats, savCatKey]);
 
   function addMonth(monthIdx) {
     const exists = months.find(m => (m.year || 2026) === selectedYear && m.monthIdx === monthIdx);
     if (exists) { setSelectedMonthIdx(monthIdx); setAdding(false); return; }
-    const newM = defaultMonth(monthIdx, selectedYear, settings);
+    const newM = defaultMonth(monthIdx, selectedYear, settings, expenseCats, savingsCats);
     const next = [...months, newM].sort((a, b) => (a.year - b.year) || (a.monthIdx - b.monthIdx));
     setMonths(next);
     setSelectedMonthIdx(monthIdx);
@@ -2862,12 +2953,12 @@ Use 0 for any price you can't find.`
             {/* Content */}
             <div style={{ padding: "0 16px" }}>
               {activeTab === "dashboard"  && <Dashboard months={yearMonths} year={selectedYear} allYears={allYears} allMonths={months} />}
-              {activeTab === "summary"   && (currentMonth ? <SummaryTab month={currentMonth} bonusData={bonusData} /> : <EmptyState icon="📋" />)}
+              {activeTab === "summary"   && (currentMonth ? <SummaryTab month={currentMonth} bonusData={bonusData} expenseCats={expenseCats} savingsCats={savingsCats} /> : <EmptyState icon="📋" />)}
               {activeTab === "payslip"   && (currentMonth ? <PayslipTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="📋" />)}
               {activeTab === "calendar"  && (currentMonth ? <WorkCalendarTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🗓" />)}
               {activeTab === "ot"        && (currentMonth ? <OTCalendarTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="⏰" />)}
-              {activeTab === "expenses" && (currentMonth ? <ExpensesTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🧾" />)}
-              {activeTab === "savings" && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="🏦" />)}
+              {activeTab === "expenses" && (currentMonth ? <ExpensesTab month={currentMonth} onChange={updateMonth} expenseCats={expenseCats} onUpdateExpCats={setExpenseCats} /> : <EmptyState icon="🧾" />)}
+              {activeTab === "savings" && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} savingsCats={savingsCats} onUpdateSavCats={setSavingsCats} /> : <EmptyState icon="🏦" />)}
               {activeTab === "investments" && <InvestmentsTab liveData={liveData} refreshLive={refreshLive} />}
               {activeTab === "tax"         && <TaxTab months={yearMonths} taxDeductions={taxDeductions} onChangeTaxDeductions={setTaxDeductions} />}
               {activeTab === "bonus"       && <BonusTab bonusData={bonusData} onChange={setBonusData} allYears={allYears} />}
@@ -2875,13 +2966,15 @@ Use 0 for any price you can't find.`
               {activeTab === "settings"    && <SettingsTab
                 settings={settings}
                 onChange={setSettings}
-                onExport={() => exportUserData(user, months, bonusData, annualExp, taxDeductions, settings)}
+                onExport={() => exportUserData(user, months, bonusData, annualExp, taxDeductions, settings, expenseCats, savingsCats)}
                 onImport={(data) => {
                   if (data.months)       { setMonths(data.months); localStorage.setItem(storageKey, JSON.stringify(data.months)); }
                   if (data.bonusData)    { setBonusData(data.bonusData); localStorage.setItem(bonusKey, JSON.stringify(data.bonusData)); }
                   if (data.annualExp)    { setAnnualExp(data.annualExp); localStorage.setItem(annualKey, JSON.stringify(data.annualExp)); }
                   if (data.taxDeductions){ setTaxDeductions(data.taxDeductions); localStorage.setItem(taxDedKey, JSON.stringify(data.taxDeductions)); }
                   if (data.settings)     { setSettings(data.settings); localStorage.setItem(SETTINGS_KEY(user.id), JSON.stringify(data.settings)); }
+                  if (data.expenseCats)  { setExpenseCats(data.expenseCats); localStorage.setItem(expCatKey, JSON.stringify(data.expenseCats)); }
+                  if (data.savingsCats)  { setSavingsCats(data.savingsCats); localStorage.setItem(savCatKey, JSON.stringify(data.savingsCats)); }
                 }}
               />}
             </div>
