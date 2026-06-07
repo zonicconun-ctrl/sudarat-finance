@@ -805,10 +805,14 @@ function ExpensesTab({ month, onChange }) {
   );
 }
 
-function SavingsTab({ month, onChange }) {
+function SavingsTab({ month, onChange, bonusData = {} }) {
   const total = SAVINGS_CATS.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
-  const { net } = calcPayslip(month, {});
+  const { net } = calcPayslip(month, bonusData);
+  const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
+  const remaining = net - totalExpenses;
+  const afterSavings = remaining - total;
   const pct = net > 0 ? (total / net) * 100 : 0;
+  const savingsPctOfRemaining = remaining > 0 ? (total / remaining) * 100 : 0;
 
   function setSav(key, val) {
     onChange({ ...month, savings: { ...month.savings, [key]: +val || 0 } });
@@ -816,10 +820,28 @@ function SavingsTab({ month, onChange }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* คงเหลือ banner */}
+      <div style={{ background: remaining >= 0 ? "#E6F7F2" : "#FDEEE9", border: `1.5px solid ${remaining >= 0 ? "#1D9E75" : "#D85A30"}`, borderRadius: 12, padding: "14px 16px" }}>
+        <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 4 }}>💵 คงเหลือหลังหักค่าใช้จ่าย (รับสุทธิ ฿{fmt(net)} − รายจ่าย ฿{fmt(totalExpenses)})</div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: remaining >= 0 ? "#1D9E75" : "#D85A30" }}>
+          {remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}
+        </div>
+        {remaining > 0 && (
+          <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+            {[10, 15, 20, 30].map(p => (
+              <span key={p} style={{ fontSize: 11, color: "var(--text3)" }}>
+                เป้า {p}% = ฿{fmt(remaining * p / 100)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)" }}>บัญชีออมทรัพย์</span>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#1D9E75" }}>฿{fmt(total)} ({fmtDec(pct, 1)}%)</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#1D9E75" }}>฿{fmt(total)} ({fmtDec(savingsPctOfRemaining, 1)}% ของคงเหลือ)</span>
         </div>
         {SAVINGS_CATS.map(c => (
           <div key={c.key} style={{ marginBottom: 12 }}>
@@ -837,10 +859,11 @@ function SavingsTab({ month, onChange }) {
         ))}
       </div>
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
-        <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 6 }}>เป้าหมายการออม</div>
+        <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 6 }}>เป้าหมายการออม (จากคงเหลือ)</div>
         {[
-          { label: "เป้า 10%", target: net * 0.1 },
-          { label: "เป้า 20%", target: net * 0.2 },
+          { label: "เป้า 10%", target: remaining * 0.1 },
+          { label: "เป้า 20%", target: remaining * 0.2 },
+          { label: "เป้า 30%", target: remaining * 0.3 },
           { label: "ออมได้จริง", target: total, bold: true },
         ].map(r => (
           <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
@@ -849,6 +872,23 @@ function SavingsTab({ month, onChange }) {
           </div>
         ))}
       </div>
+
+      {/* เหลือใช้จ่ายหลังออม */}
+      <div style={{
+        background: afterSavings >= 0 ? "#E6F1FB" : "#FDEEE9",
+        border: `1.5px solid ${afterSavings >= 0 ? "#378ADD" : "#D85A30"}`,
+        borderRadius: 12, padding: "14px 16px",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <div>
+          <div style={{ fontSize: 12, color: "var(--text2)" }}>🎯 เหลือใช้จ่ายหลังออม</div>
+          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>ออม {fmtDec(savingsPctOfRemaining, 1)}% ของคงเหลือ</div>
+        </div>
+        <span style={{ fontSize: 22, fontWeight: 800, color: afterSavings >= 0 ? "#378ADD" : "#D85A30" }}>
+          {afterSavings >= 0 ? "" : "-"}฿{fmt(Math.abs(afterSavings))}
+        </span>
+      </div>
+
     </div>
   );
 }
@@ -1476,7 +1516,7 @@ const OT_TYPES = [
 
 const OT_MULT = { ot1: 1, ot15: 1.5, ot2: 2, ot25: 2.5, ot3: 3 };
 
-function OTCalendarTab({ month, onChange }) {
+function OTCalendarTab({ month, onChange, bonusData = {} }) {
   const [selectedDays, setSelectedDays] = useState([]);
   const [otType, setOtType] = useState("ot15");
   const [hours, setHours] = useState(2);
@@ -1549,6 +1589,38 @@ function OTCalendarTab({ month, onChange }) {
           <span style={{ fontSize: 15, fontWeight: 700, color: "#1D9E75" }}>฿{fmt(totalOTBaht)}</span>
         </div>
       </div>
+
+      {/* OT Income Summary */}
+      {(() => {
+        const { gross, net } = calcPayslip(month, bonusData);
+        const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
+        const remaining = net - totalExpenses;
+        const savingsPct = net > 0 ? (remaining / net) * 100 : 0;
+        return (
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 12 }}>📊 สรุปรายได้เดือนนี้ (รวม OT)</div>
+            {[
+              { label: "รายรับรวม (Gross)", value: gross, color: "#1D9E75" },
+              { label: "รับสุทธิ (Net)", value: net, color: "#378ADD" },
+              { label: "รายจ่ายรวม", value: totalExpenses, color: "#D85A30" },
+            ].map(r => (
+              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 13, color: "var(--text2)" }}>{r.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: r.color }}>฿{fmt(r.value)}</span>
+              </div>
+            ))}
+            <div style={{ marginTop: 10, background: remaining >= 0 ? "#E6F7F2" : "#FDEEE9", border: `1px solid ${remaining >= 0 ? "#1D9E75" : "#D85A30"}`, borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text1)" }}>💵 คงเหลือหลังค่าใช้จ่าย</div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>คิดเป็น {fmtDec(savingsPct, 1)}% ของรายรับสุทธิ</div>
+              </div>
+              <span style={{ fontSize: 22, fontWeight: 800, color: remaining >= 0 ? "#1D9E75" : "#D85A30" }}>
+                {remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Controls */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
@@ -2793,9 +2865,9 @@ Use 0 for any price you can't find.`
               {activeTab === "summary"   && (currentMonth ? <SummaryTab month={currentMonth} bonusData={bonusData} /> : <EmptyState icon="📋" />)}
               {activeTab === "payslip"   && (currentMonth ? <PayslipTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="📋" />)}
               {activeTab === "calendar"  && (currentMonth ? <WorkCalendarTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🗓" />)}
-              {activeTab === "ot"        && (currentMonth ? <OTCalendarTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="⏰" />)}
+              {activeTab === "ot"        && (currentMonth ? <OTCalendarTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="⏰" />)}
               {activeTab === "expenses" && (currentMonth ? <ExpensesTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🧾" />)}
-              {activeTab === "savings" && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🏦" />)}
+              {activeTab === "savings" && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="🏦" />)}
               {activeTab === "investments" && <InvestmentsTab liveData={liveData} refreshLive={refreshLive} />}
               {activeTab === "tax"         && <TaxTab months={yearMonths} taxDeductions={taxDeductions} onChangeTaxDeductions={setTaxDeductions} />}
               {activeTab === "bonus"       && <BonusTab bonusData={bonusData} onChange={setBonusData} allYears={allYears} />}
