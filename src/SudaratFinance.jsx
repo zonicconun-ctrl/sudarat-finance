@@ -791,21 +791,21 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
       {/* ── Live Summary Banner ── */}
-      <div style={{ background: "linear-gradient(135deg,#185FA5,#378ADD)", borderRadius: 14, padding: "16px 18px", color: "#fff" }}>
-        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>สรุปรายรับเดือนนี้</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-          <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-            <div style={{ fontSize: 10, opacity: 0.85 }}>รายรับรวม</div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>฿{fmt(gross)}</div>
-          </div>
-          <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-            <div style={{ fontSize: 10, opacity: 0.85 }}>รับสุทธิ</div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>฿{fmt(net)}</div>
-          </div>
-          <div style={{ background: remaining >= 0 ? "rgba(29,158,117,0.35)" : "rgba(216,90,48,0.35)", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-            <div style={{ fontSize: 10, opacity: 0.85 }}>หลังหักค่าใช้จ่าย</div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>{remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}</div>
-          </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+        {/* รายรับรวม — น้ำเงิน */}
+        <div style={{ background: "linear-gradient(145deg,#185FA5,#2D7DD2)", borderRadius: 14, padding: "14px 10px", textAlign: "center", color: "#fff", boxShadow: "0 3px 10px rgba(24,95,165,0.3)" }}>
+          <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>💰 รายรับรวม</div>
+          <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.2 }}>฿{fmt(gross)}</div>
+        </div>
+        {/* รับสุทธิ — เขียวเทา */}
+        <div style={{ background: "linear-gradient(145deg,#0F6E56,#1D9E75)", borderRadius: 14, padding: "14px 10px", textAlign: "center", color: "#fff", boxShadow: "0 3px 10px rgba(29,158,117,0.3)" }}>
+          <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>✂️ รับสุทธิ</div>
+          <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.2 }}>฿{fmt(net)}</div>
+        </div>
+        {/* คงเหลือ — ส้ม/แดง ถ้าติดลบ */}
+        <div style={{ background: remaining >= 0 ? "linear-gradient(145deg,#B87A00,#EF9F27)" : "linear-gradient(145deg,#A83220,#D85A30)", borderRadius: 14, padding: "14px 10px", textAlign: "center", color: "#fff", boxShadow: remaining >= 0 ? "0 3px 10px rgba(239,159,39,0.35)" : "0 3px 10px rgba(216,90,48,0.35)" }}>
+          <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>🏦 คงเหลือ</div>
+          <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.2 }}>{remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}</div>
         </div>
       </div>
 
