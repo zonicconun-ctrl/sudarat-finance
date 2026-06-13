@@ -188,11 +188,13 @@ function calcPayslip(m, bonusData) {
   const qBonus = getQuarterlyBonusForMonth(m.monthIdx, yearBonus);
   const quarterlyBonusAmt = qBonus?.amount || 0;
 
-  const ot = (m.ot1 || 0) * m.hourlyRate
-    + (m.ot15 || 0) * m.hourlyRate * 1.5
-    + (m.ot2 || 0) * m.hourlyRate * 2
-    + (m.ot25 || 0) * m.hourlyRate * 2.5
-    + (m.ot3 || 0) * m.hourlyRate * 3;
+  // ถ้า hourlyRate ไม่ได้ตั้ง ให้คำนวณ auto จาก baseSalary ÷ 30 ÷ 8
+  const effectiveHourlyRate = m.hourlyRate || Math.round((m.baseSalary || 0) / 30 / 8 * 100) / 100;
+  const ot = (m.ot1 || 0) * effectiveHourlyRate
+    + (m.ot15 || 0) * effectiveHourlyRate * 1.5
+    + (m.ot2 || 0) * effectiveHourlyRate * 2
+    + (m.ot25 || 0) * effectiveHourlyRate * 2.5
+    + (m.ot3 || 0) * effectiveHourlyRate * 3;
 
   const gross = m.baseSalary + ot + actualMeal + actualDiligence + (m.bonus || 0) + quarterlyBonusAmt;
   const deductions = (m.sso || 0) + (m.providentFund || 0);
@@ -763,6 +765,12 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
     width: 120, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)",
     borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)"
   };
+
+  // อัตราค่าแรง/ชั่วโมง: auto จากเงินเดือน ถ้าไม่เคยตั้งค่าเอง
+  const autoHourlyRate = Math.round(((month.baseSalary || 0) / 30 / 8) * 100) / 100;
+  const displayHourlyRate = month.hourlyRate || autoHourlyRate;
+  const isAutoRate = !month.hourlyRate || month.hourlyRate === 0;
+
   // ใช้ function ปกติแทน component เพื่อกัน focus หลุด
   function renderRow(label, field, opts = {}) {
     const { readOnly, value, sub } = opts;
@@ -805,7 +813,25 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 12 }}>💵 เงินเดือน & การหัก</div>
         {renderRow("เงินเดือนฐาน (บาท)", "baseSalary")}
-        {renderRow("อัตราค่าแรง / ชั่วโมง", "hourlyRate", { sub: "ใช้คำนวณค่า OT" })}
+        {/* hourly rate: auto = baseSalary/30/8, override ได้ */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>อัตราค่าแรง / ชั่วโมง</div>
+            <div style={{ fontSize: 11, color: isAutoRate ? "#1D9E75" : "var(--text3)", marginTop: 1 }}>
+              {isAutoRate ? `⚡ Auto: เงินเดือน ÷ 30 ÷ 8 = ฿${fmtDec(autoHourlyRate,2)}` : `แก้ไขเอง (auto = ฿${fmtDec(autoHourlyRate,2)})`}
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+            <input type="number" value={month.hourlyRate ?? ""} placeholder={String(autoHourlyRate)}
+              onChange={e => set("hourlyRate", e.target.value)} style={incInputStyle} />
+            {!isAutoRate && (
+              <button onClick={() => onChange({ ...month, hourlyRate: 0 })}
+                style={{ fontSize: 10, color: "#378ADD", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                รีเซ็ต auto
+              </button>
+            )}
+          </div>
+        </div>
         {renderRow("อัตราค่าข้าว / วัน (฿)", "mealRatePerDay")}
         {renderRow(`ค่าข้าว (${workDays} วัน)`, "meal_ro", { readOnly: true, value: actualMeal })}
         {renderRow("เบี้ยขยัน (เต็มเดือน)", "diligenceBonus")}
@@ -2629,6 +2655,35 @@ function SettingsTab({ settings, onChange, onExport, onImport }) {
 }
 
 // ─────────────────────────────────────────────────────────
+//  CalendarShell  — sub-tab: วันทำงาน | OT
+// ─────────────────────────────────────────────────────────
+function CalendarShell({ month, onChange, bonusData }) {
+  const [sub, setSub] = useState("work");
+  const tabs = [
+    { id: "work", label: "🗓 วันทำงาน" },
+    { id: "ot",   label: "⏰ ปฏิทิน OT" },
+  ];
+  return (
+    <div>
+      {/* sub-tab pills */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setSub(t.id)} style={{
+            flex: 1, padding: "8px 0", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 13, fontWeight: sub === t.id ? 700 : 400,
+            background: sub === t.id ? "#185FA5" : "var(--card-bg)",
+            color: sub === t.id ? "#fff" : "var(--text2)",
+            boxShadow: sub === t.id ? "0 2px 8px rgba(24,95,165,0.3)" : "none",
+            transition: "all 0.15s",
+          }}>{t.label}</button>
+        ))}
+      </div>
+      {sub === "work" && <WorkCalendarTab month={month} onChange={onChange} />}
+      {sub === "ot"   && <OTCalendarTab   month={month} onChange={onChange} bonusData={bonusData} />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
 //  MoreTab  — grid ลิ้งค์ไปหน้าที่ใช้น้อย
 // ─────────────────────────────────────────────────────────
 function MoreTab({ onNavigate }) {
@@ -3118,7 +3173,9 @@ Use 0 for any price you can't find.`
             <div style={{ padding: "0 16px" }}>
               {activeTab === "dashboard"  && <Dashboard months={yearMonths} year={selectedYear} allYears={allYears} allMonths={months} />}
               {activeTab === "income"    && (currentMonth ? <IncomeTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="💰" />)}
-              {activeTab === "calendar"  && (currentMonth ? <WorkCalendarTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🗓" />)}
+              {activeTab === "calendar"  && (currentMonth
+                ? <CalendarShell month={currentMonth} onChange={updateMonth} bonusData={bonusData} />
+                : <EmptyState icon="🗓" />)}
               {activeTab === "expenses"  && (currentMonth ? <ExpensesTab month={currentMonth} onChange={updateMonth} expenseCats={expenseCats} onUpdateExpCats={setExpenseCats} /> : <EmptyState icon="🧾" />)}
               {activeTab === "savings"   && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} savingsCats={savingsCats} onUpdateSavCats={setSavingsCats} /> : <EmptyState icon="🏦" />)}
               {activeTab === "more" && (
