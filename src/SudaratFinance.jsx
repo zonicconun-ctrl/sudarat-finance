@@ -675,6 +675,7 @@ function Dashboard({ months, year, allYears = [], allMonths = [] }) {
   );
 }
 
+// eslint-disable-next-line no-unused-vars
 function PayslipTab({ month, onChange, bonusData = {} }) {
   const { ot, gross, deductions, net, workDays, leaveCount, actualMeal, actualDiligence, quarterlyBonusAmt } = calcPayslip(month, bonusData);
 
@@ -768,7 +769,6 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
 
   // อัตราค่าแรง/ชั่วโมง: auto จากเงินเดือน ถ้าไม่เคยตั้งค่าเอง
   const autoHourlyRate = Math.round(((month.baseSalary || 0) / 30 / 8) * 100) / 100;
-  const displayHourlyRate = month.hourlyRate || autoHourlyRate;
   const isAutoRate = !month.hourlyRate || month.hourlyRate === 0;
 
   // ใช้ function ปกติแทน component เพื่อกัน focus หลุด
@@ -1064,7 +1064,6 @@ function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CAT
   const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
   const remaining = net - totalExpenses;
   const afterSavings = remaining - total;
-  const pct = net > 0 ? (total / net) * 100 : 0;
   const savingsPctOfRemaining = remaining > 0 ? (total / remaining) * 100 : 0;
   const [editingCat, setEditingCat] = useState(null);
 
@@ -1473,7 +1472,7 @@ const ANNUAL_EXPENSE_CATS = [
 
 // ─── Summary Tab ───────────────────────────────────────────
 function SummaryTab({ month, bonusData, expenseCats = EXPENSE_CATS, savingsCats = SAVINGS_CATS }) {
-  const { ot, gross, deductions, net, actualMeal, actualDiligence, quarterlyBonusAmt } = calcPayslip(month, bonusData);
+  const { ot, gross, net, actualMeal, actualDiligence, quarterlyBonusAmt } = calcPayslip(month, bonusData);
   const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
   const remaining = net - totalExpenses;
   const totalSavings = savingsCats.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
