@@ -759,21 +759,25 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
   const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
   const remaining = net - totalExpenses;
 
-  const inputStyle = {
+  const incInputStyle = {
     width: 120, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)",
     borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)"
   };
-  const Row = ({ label, field, readOnly = false, value, sub }) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, color: "var(--text2)" }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1 }}>{sub}</div>}
+  // ใช้ function ปกติแทน component เพื่อกัน focus หลุด
+  function renderRow(label, field, opts = {}) {
+    const { readOnly, value, sub } = opts;
+    return (
+      <div key={field || label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: "var(--text2)" }}>{label}</div>
+          {sub && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1 }}>{sub}</div>}
+        </div>
+        {readOnly
+          ? <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text1)" }}>฿{fmt(value ?? 0)}</span>
+          : <input type="number" value={month[field] ?? 0} onChange={e => set(field, e.target.value)} style={incInputStyle} />}
       </div>
-      {readOnly
-        ? <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text1)" }}>฿{fmt(value ?? 0)}</span>
-        : <input type="number" value={month[field] ?? 0} onChange={e => set(field, e.target.value)} style={inputStyle} />}
-    </div>
-  );
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -800,14 +804,14 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
       {/* ── เงินเดือน & การหัก ── */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 12 }}>💵 เงินเดือน & การหัก</div>
-        <Row label="เงินเดือนฐาน (บาท)" field="baseSalary" />
-        <Row label="อัตราค่าแรง / ชั่วโมง" field="hourlyRate" sub="ใช้คำนวณค่า OT" />
-        <Row label="อัตราค่าข้าว / วัน (฿)" field="mealRatePerDay" />
-        <Row label={`ค่าข้าว (${workDays} วัน)`} readOnly value={actualMeal} />
-        <Row label="เบี้ยขยัน (เต็มเดือน)" field="diligenceBonus" />
-        <Row label={leaveCount > 0 ? `เบี้ยขยัน (ลา ${leaveCount} วัน → หัก)` : "เบี้ยขยัน (ได้เต็ม)"} readOnly value={actualDiligence} />
-        <Row label="หัก ประกันสังคม" field="sso" />
-        <Row label="หัก กองทุนสำรองเลี้ยงชีพ" field="providentFund" />
+        {renderRow("เงินเดือนฐาน (บาท)", "baseSalary")}
+        {renderRow("อัตราค่าแรง / ชั่วโมง", "hourlyRate", { sub: "ใช้คำนวณค่า OT" })}
+        {renderRow("อัตราค่าข้าว / วัน (฿)", "mealRatePerDay")}
+        {renderRow(`ค่าข้าว (${workDays} วัน)`, "meal_ro", { readOnly: true, value: actualMeal })}
+        {renderRow("เบี้ยขยัน (เต็มเดือน)", "diligenceBonus")}
+        {renderRow(leaveCount > 0 ? `เบี้ยขยัน (ลา ${leaveCount} วัน → หัก)` : "เบี้ยขยัน (ได้เต็ม)", "dil_ro", { readOnly: true, value: actualDiligence })}
+        {renderRow("หัก ประกันสังคม", "sso")}
+        {renderRow("หัก กองทุนสำรองเลี้ยงชีพ", "providentFund")}
       </div>
 
       {/* ── OT ── */}
@@ -824,7 +828,7 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
                 {hrs > 0 && <span style={{ fontSize: 11, color: t.color, marginLeft: 8 }}>= ฿{fmt(baht)}</span>}
               </div>
               <input type="number" value={hrs} onChange={e => set(t.key, e.target.value)}
-                style={{ ...inputStyle, width: 90 }} />
+                style={{ ...incInputStyle, width: 90 }} />
             </div>
           );
         })}
@@ -837,7 +841,7 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
       {/* ── โบนัส / พิเศษ ── */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 12 }}>🎁 โบนัส & รายได้พิเศษ</div>
-        <Row label="โบนัส / รายได้พิเศษเดือนนี้" field="bonus" />
+        {renderRow("โบนัส / รายได้พิเศษเดือนนี้", "bonus")}
         {quarterlyBonusAmt > 0 && (
           <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
             <span style={{ fontSize: 13, color: "var(--text2)" }}>โบนัสรายไตรมาส (จากหน้าโบนัส)</span>
