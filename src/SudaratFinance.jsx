@@ -1764,10 +1764,11 @@ function OTCalendarTab({ month, onChange, bonusData = {} }) {
   const [hours, setHours] = useState(2);
 
   const monthIdx = month.monthIdx;
-  const year = 2026;
+  const year = month.year || new Date().getFullYear();
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
   const firstDay = new Date(year, monthIdx, 1).getDay(); // 0=Sun
-  const hourlyRate = month.hourlyRate || 129.24;
+  const effectiveRate = month.hourlyRate || Math.round((month.baseSalary || 0) / 30 / 8 * 100) / 100 || 129.24;
+  const hourlyRate = effectiveRate;
 
   // otLog: { "1": {ot15: 2}, "3": {ot1: 1, ot15: 2}, ... }
   const otLog = month.otLog || {};
@@ -1809,8 +1810,27 @@ function OTCalendarTab({ month, onChange, bonusData = {} }) {
 
   const DAY_LABELS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
+  // ตรวจสอบว่ามี OT totals แต่ otLog ว่าง (data import จากกรอกมือ)
+  const hasTotalOT = OT_TYPES.some(t => (month[t.key] || 0) > 0);
+  const hasLogData = Object.keys(otLog).length > 0;
+  const isManualOTOnly = hasTotalOT && !hasLogData;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* แจ้งเตือนถ้า data เป็นยอดรวมไม่มีรายวัน */}
+      {isManualOTOnly && (
+        <div style={{ background: "#FEF3E2", border: "1px solid #EF9F27", borderRadius: 10, padding: "10px 14px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <span style={{ fontSize: 16 }}>ℹ️</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#B87A00" }}>ข้อมูล OT เป็นยอดรวม ไม่มีข้อมูลรายวัน</div>
+            <div style={{ fontSize: 11, color: "#8A5C00", marginTop: 3, lineHeight: 1.5 }}>
+              ยอดชั่วโมง OT ถูก import มาแล้ว (ดูได้ในหน้า รายรับ) แต่ไม่มีข้อมูลว่าทำวันไหนบ้าง
+              ปฏิทินด้านล่างจึงว่างอยู่ — ถ้าต้องการเพิ่มรายละเอียดรายวัน กดเลือกวันแล้วบันทึกได้เลย
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
