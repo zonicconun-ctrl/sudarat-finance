@@ -2590,17 +2590,17 @@ function exportUserData(user, months, bonusData, annualExp, taxDeductions, setti
 }
 
 // ─── Settings Tab ──────────────────────────────────────────
-function SettingsTab({ settings, onChange, onExport, onImport }) {
-  function set(key, val) { onChange({ ...settings, [key]: val }); }
-
-  const Section = ({ title, children }) => (
+function SettingsSection({ title, children }) {
+  return (
     <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 0 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 12 }}>{title}</div>
       {children}
     </div>
   );
+}
 
-  const Row = ({ label, note, children }) => (
+function SettingsRow({ label, note, children }) {
+  return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--border)" }}>
       <div style={{ flex: 1, paddingRight: 12 }}>
         <div style={{ fontSize: 13, color: "var(--text2)" }}>{label}</div>
@@ -2609,12 +2609,18 @@ function SettingsTab({ settings, onChange, onExport, onImport }) {
       {children}
     </div>
   );
+}
 
-  const NumInput = ({ field, min = 0, step = 1 }) => (
-    <input type="number" min={min} step={step} value={settings[field] ?? 0}
-      onChange={e => set(field, +e.target.value || 0)}
+function SettingsNumInput({ value, onChange, min = 0, step = 1 }) {
+  return (
+    <input type="number" min={min} step={step} value={value ?? 0}
+      onChange={e => onChange(+e.target.value || 0)}
       style={{ width: 100, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 8px", fontSize: 13, color: "var(--text1)" }} />
   );
+}
+
+function SettingsTab({ settings, onChange, onExport, onImport }) {
+  function set(key, val) { onChange({ ...settings, [key]: val }); }
 
   const hourlyRateCalc = settings.workingDaysPerMonth > 0 && settings.workingHoursPerDay > 0
     ? `ตัวหาร = ${settings.workingDaysPerMonth} × ${settings.workingHoursPerDay} = ${settings.workingDaysPerMonth * settings.workingHoursPerDay} ชม./เดือน`
@@ -2623,14 +2629,14 @@ function SettingsTab({ settings, onChange, onExport, onImport }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-      <Section title="⏰ รอบการตัดเงินเดือน">
-        <Row label="วันตัดรอบ OT" note="ระบบนับ OT ตั้งแต่วันนี้ของเดือนก่อน ถึงวันนี้ของเดือนปัจจุบัน">
+      <SettingsSection title="⏰ รอบการตัดเงินเดือน">
+        <SettingsRow label="วันตัดรอบ OT" note="ระบบนับ OT ตั้งแต่วันนี้ของเดือนก่อน ถึงวันนี้ของเดือนปัจจุบัน">
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <NumInput field="otCutoffDay" min={1} />
+            <SettingsNumInput value={settings["otCutoffDay"]} onChange={v => set("otCutoffDay", v)} min={1} />
             <span style={{ fontSize: 12, color: "var(--text3)" }}>ของเดือน</span>
           </div>
-        </Row>
-        <Row label="วันตัดรอบวันลา" note="วันที่นับวันลาของรอบนั้น">
+        </SettingsRow>
+        <SettingsRow label="วันตัดรอบวันลา" note="วันที่นับวันลาของรอบนั้น">
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={() => set("leaveCutoffEOM", true)} style={{
               padding: "5px 12px", borderRadius: 16, border: `1.5px solid ${settings.leaveCutoffEOM ? "#378ADD" : "var(--border)"}`,
@@ -2643,38 +2649,38 @@ function SettingsTab({ settings, onChange, onExport, onImport }) {
               color: !settings.leaveCutoffEOM ? "#185FA5" : "var(--text2)", fontSize: 12, cursor: "pointer",
             }}>ตาม OT</button>
           </div>
-        </Row>
-      </Section>
+        </SettingsRow>
+      </SettingsSection>
 
-      <Section title="💰 ค่าตอบแทนรายวัน">
-        <Row label="ค่าข้าว / วันทำงานปกติ (฿)" note="ใช้เป็นค่า default ของเดือนใหม่">
-          <NumInput field="mealRatePerDay" />
-        </Row>
-        <Row label="ค่าข้าวเพิ่ม / วันที่ทำ OT (฿)" note="วันที่ log OT ไว้ จะได้ค่าข้าวเพิ่มอีก">
-          <NumInput field="mealRateOT" />
-        </Row>
-        <Row label="ค่าเดินทาง / วันทำงาน (฿)" note="ถ้าได้ทุกวันทำงาน">
-          <NumInput field="travelPerDay" />
-        </Row>
-        <Row label="เบี้ยขยัน / เดือน (฿)" note="ได้เต็มถ้าไม่มีลาป่วย/ลากิจ">
-          <NumInput field="diligenceBonus" />
-        </Row>
-      </Section>
+      <SettingsSection title="💰 ค่าตอบแทนรายวัน">
+        <SettingsRow label="ค่าข้าว / วันทำงานปกติ (฿)" note="ใช้เป็นค่า default ของเดือนใหม่">
+          <SettingsNumInput value={settings["mealRatePerDay"]} onChange={v => set("mealRatePerDay", v)} />
+        </SettingsRow>
+        <SettingsRow label="ค่าข้าวเพิ่ม / วันที่ทำ OT (฿)" note="วันที่ log OT ไว้ จะได้ค่าข้าวเพิ่มอีก">
+          <SettingsNumInput value={settings["mealRateOT"]} onChange={v => set("mealRateOT", v)} />
+        </SettingsRow>
+        <SettingsRow label="ค่าเดินทาง / วันทำงาน (฿)" note="ถ้าได้ทุกวันทำงาน">
+          <SettingsNumInput value={settings["travelPerDay"]} onChange={v => set("travelPerDay", v)} />
+        </SettingsRow>
+        <SettingsRow label="เบี้ยขยัน / เดือน (฿)" note="ได้เต็มถ้าไม่มีลาป่วย/ลากิจ">
+          <SettingsNumInput value={settings["diligenceBonus"]} onChange={v => set("diligenceBonus", v)} />
+        </SettingsRow>
+      </SettingsSection>
 
-      <Section title="📐 ตัวหารอัตราค่าแรง OT">
-        <Row label="วันทำงาน / เดือน" note="ตัวเลขสำหรับหาร (เช่น 30 วัน)">
-          <NumInput field="workingDaysPerMonth" min={1} />
-        </Row>
-        <Row label="ชั่วโมงทำงาน / วัน" note="เช่น 8 หรือ 9 ชม./วัน">
-          <NumInput field="workingHoursPerDay" min={1} />
-        </Row>
+      <SettingsSection title="📐 ตัวหารอัตราค่าแรง OT">
+        <SettingsRow label="วันทำงาน / เดือน" note="ตัวเลขสำหรับหาร (เช่น 30 วัน)">
+          <SettingsNumInput value={settings["workingDaysPerMonth"]} onChange={v => set("workingDaysPerMonth", v)} min={1} />
+        </SettingsRow>
+        <SettingsRow label="ชั่วโมงทำงาน / วัน" note="เช่น 8 หรือ 9 ชม./วัน">
+          <SettingsNumInput value={settings["workingHoursPerDay"]} onChange={v => set("workingHoursPerDay", v)} min={1} />
+        </SettingsRow>
         {hourlyRateCalc && (
           <div style={{ padding: "10px 0 4px", fontSize: 12, color: "var(--text3)" }}>
             💡 {hourlyRateCalc}
             <br />อัตรา OT x1 = เงินเดือน ÷ {settings.workingDaysPerMonth * settings.workingHoursPerDay} ชม.
           </div>
         )}
-      </Section>
+      </SettingsSection>
 
       <div style={{ background: "#E6F7F2", border: "1px solid #1D9E75", borderRadius: 10, padding: "10px 14px" }}>
         <div style={{ fontSize: 12, color: "#0F6E56", fontWeight: 500, marginBottom: 4 }}>💡 การใช้งาน</div>
