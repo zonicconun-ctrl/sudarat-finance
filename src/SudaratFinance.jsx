@@ -202,18 +202,12 @@ function calcPayslip(m, bonusData) {
 
 
 const TABS = [
-  { id: "dashboard",   label: "ภาพรวม",   icon: "📊" },
-  { id: "summary",     label: "สรุปเดือน", icon: "📋" },
-  { id: "payslip",     label: "เงินเดือน", icon: "💵" },
-  { id: "calendar",    label: "ปฏิทิน",   icon: "🗓" },
-  { id: "ot",          label: "OT",        icon: "⏰" },
-  { id: "bonus",       label: "โบนัส",    icon: "🎁" },
-  { id: "expenses",    label: "รายจ่าย",  icon: "🧾" },
-  { id: "annual",      label: "ปีละครั้ง", icon: "📅" },
-  { id: "savings",     label: "การออม",   icon: "🏦" },
-  { id: "investments", label: "ลงทุน",    icon: "📈" },
-  { id: "tax",         label: "ภาษี",     icon: "🧮" },
-  { id: "settings",    label: "ตั้งค่า",  icon: "⚙️" },
+  { id: "dashboard", label: "ภาพรวม",     icon: "📊" },
+  { id: "income",    label: "รายรับ",     icon: "💰" },
+  { id: "calendar",  label: "ปฏิทิน",    icon: "🗓" },
+  { id: "expenses",  label: "รายจ่าย",   icon: "🧾" },
+  { id: "savings",   label: "ออม & สรุป", icon: "🏦" },
+  { id: "more",      label: "อื่นๆ",      icon: "☰"  },
 ];
 
 // ─── Work Calendar ──────────────────────────────────────────
@@ -742,6 +736,145 @@ function PayslipTab({ month, onChange, bonusData = {} }) {
         ))}
       </div>
 
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
+        <label style={{ fontSize: 12, color: "var(--text2)" }}>หมายเหตุ</label>
+        <textarea value={month.notes || ""} onChange={e => onChange({ ...month, notes: e.target.value })}
+          rows={2} placeholder="บันทึกเพิ่มเติม..."
+          style={{ width: "100%", marginTop: 6, background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: "var(--text1)", resize: "vertical", boxSizing: "border-box" }} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+//  IncomeTab  — รายรับรวมหน้าเดียว (เงินเดือน + OT + โบนัส)
+// ─────────────────────────────────────────────────────────
+function IncomeTab({ month, onChange, bonusData = {} }) {
+  const { ot, gross, net, deductions, workDays, leaveCount, actualMeal, actualDiligence, quarterlyBonusAmt } = calcPayslip(month, bonusData);
+
+  function set(field, val) {
+    onChange({ ...month, [field]: +val || 0 });
+  }
+
+  const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
+  const remaining = net - totalExpenses;
+
+  const inputStyle = {
+    width: 120, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)",
+    borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)"
+  };
+  const Row = ({ label, field, readOnly = false, value, sub }) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, color: "var(--text2)" }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1 }}>{sub}</div>}
+      </div>
+      {readOnly
+        ? <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text1)" }}>฿{fmt(value ?? 0)}</span>
+        : <input type="number" value={month[field] ?? 0} onChange={e => set(field, e.target.value)} style={inputStyle} />}
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* ── Live Summary Banner ── */}
+      <div style={{ background: "linear-gradient(135deg,#185FA5,#378ADD)", borderRadius: 14, padding: "16px 18px", color: "#fff" }}>
+        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>สรุปรายรับเดือนนี้</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 10, opacity: 0.85 }}>รายรับรวม</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>฿{fmt(gross)}</div>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 10, opacity: 0.85 }}>รับสุทธิ</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>฿{fmt(net)}</div>
+          </div>
+          <div style={{ background: remaining >= 0 ? "rgba(29,158,117,0.35)" : "rgba(216,90,48,0.35)", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 10, opacity: 0.85 }}>หลังหักค่าใช้จ่าย</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>{remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── เงินเดือน & การหัก ── */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 12 }}>💵 เงินเดือน & การหัก</div>
+        <Row label="เงินเดือนฐาน (บาท)" field="baseSalary" />
+        <Row label="อัตราค่าแรง / ชั่วโมง" field="hourlyRate" sub="ใช้คำนวณค่า OT" />
+        <Row label="อัตราค่าข้าว / วัน (฿)" field="mealRatePerDay" />
+        <Row label={`ค่าข้าว (${workDays} วัน)`} readOnly value={actualMeal} />
+        <Row label="เบี้ยขยัน (เต็มเดือน)" field="diligenceBonus" />
+        <Row label={leaveCount > 0 ? `เบี้ยขยัน (ลา ${leaveCount} วัน → หัก)` : "เบี้ยขยัน (ได้เต็ม)"} readOnly value={actualDiligence} />
+        <Row label="หัก ประกันสังคม" field="sso" />
+        <Row label="หัก กองทุนสำรองเลี้ยงชีพ" field="providentFund" />
+      </div>
+
+      {/* ── OT ── */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 4 }}>⏰ ชั่วโมง OT</div>
+        <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 12 }}>กรอกชั่วโมงรวมทั้งเดือน หรือบันทึกรายวันที่หน้า ปฏิทิน</div>
+        {OT_TYPES.map(t => {
+          const hrs = month[t.key] || 0;
+          const baht = hrs * (month.hourlyRate || 129.24) * OT_MULT[t.key];
+          return (
+            <div key={t.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 13, color: "var(--text2)" }}>{t.label}</span>
+                {hrs > 0 && <span style={{ fontSize: 11, color: t.color, marginLeft: 8 }}>= ฿{fmt(baht)}</span>}
+              </div>
+              <input type="number" value={hrs} onChange={e => set(t.key, e.target.value)}
+                style={{ ...inputStyle, width: 90 }} />
+            </div>
+          );
+        })}
+        <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, marginTop: 2 }}>
+          <span style={{ fontSize: 13, color: "var(--text2)", fontWeight: 500 }}>รวมค่า OT</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#1D9E75" }}>฿{fmt(ot)}</span>
+        </div>
+      </div>
+
+      {/* ── โบนัส / พิเศษ ── */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 12 }}>🎁 โบนัส & รายได้พิเศษ</div>
+        <Row label="โบนัส / รายได้พิเศษเดือนนี้" field="bonus" />
+        {quarterlyBonusAmt > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+            <span style={{ fontSize: 13, color: "var(--text2)" }}>โบนัสรายไตรมาส (จากหน้าโบนัส)</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#7F77DD" }}>฿{fmt(quarterlyBonusAmt)}</span>
+          </div>
+        )}
+        {quarterlyBonusAmt === 0 && (
+          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>
+            ตั้งโบนัสรายไตรมาสได้ที่ อื่นๆ → โบนัส
+          </div>
+        )}
+      </div>
+
+      {/* ── สรุปสลิป ── */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)", marginBottom: 12 }}>📄 สรุปสลิปเงินเดือน</div>
+        {[
+          { label: "เงินเดือนฐาน", v: month.baseSalary || 0, color: "var(--text1)" },
+          { label: `OT รวม (${OT_TYPES.reduce((a, t) => a + (month[t.key] || 0), 0)} ชม.)`, v: ot, color: "#1D9E75", hide: ot === 0 },
+          { label: `ค่าข้าว (${workDays} วัน)`, v: actualMeal, color: "#378ADD", hide: actualMeal === 0 },
+          { label: leaveCount > 0 ? `เบี้ยขยัน (ลา ${leaveCount} วัน)` : "เบี้ยขยัน", v: actualDiligence, color: leaveCount > 0 ? "#D85A30" : "#1D9E75", hide: (month.diligenceBonus || 0) === 0 },
+          { label: "โบนัสรายไตรมาส", v: quarterlyBonusAmt, color: "#7F77DD", hide: quarterlyBonusAmt === 0 },
+          { label: "โบนัส / พิเศษ", v: month.bonus || 0, color: "#378ADD", hide: !month.bonus },
+          { label: "รายได้รวม (Gross)", v: gross, color: "var(--text1)", bold: true },
+          { label: "หักรวม", v: -deductions, color: "#D85A30" },
+          { label: "รับสุทธิ (Net)", v: net, color: "#1D9E75", bold: true, large: true },
+        ].filter(r => !r.hide).map(r => (
+          <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+            <span style={{ fontSize: 13, color: "var(--text2)", fontWeight: r.bold ? 500 : 400 }}>{r.label}</span>
+            <span style={{ fontSize: r.large ? 18 : 13, fontWeight: r.bold ? 600 : 400, color: r.color }}>
+              {r.v < 0 ? "-฿" : "฿"}{fmt(Math.abs(r.v))}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Notes ── */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
         <label style={{ fontSize: 12, color: "var(--text2)" }}>หมายเหตุ</label>
         <textarea value={month.notes || ""} onChange={e => onChange({ ...month, notes: e.target.value })}
@@ -2491,6 +2624,32 @@ function SettingsTab({ settings, onChange, onExport, onImport }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────
+//  MoreTab  — grid ลิ้งค์ไปหน้าที่ใช้น้อย
+// ─────────────────────────────────────────────────────────
+function MoreTab({ onNavigate }) {
+  const items = [
+    { id: "summary",     icon: "📋", label: "สรุปเดือน",      desc: "รายรับ-รายจ่าย-ออม ในหน้าเดียว" },
+    { id: "bonus",       icon: "🎁", label: "โบนัสประจำปี",   desc: "ตั้งค่าโบนัสรายไตรมาส" },
+    { id: "annual",      icon: "📅", label: "ค่าใช้จ่ายปีละครั้ง", desc: "ประกัน / ต่อทะเบียน / อื่นๆ" },
+    { id: "investments", icon: "📈", label: "การลงทุน",        desc: "ติดตามพอร์ตและเงินปันผล" },
+    { id: "tax",         icon: "🧮", label: "ภาษี",            desc: "คำนวณและวางแผนภาษีปี" },
+    { id: "settings",    icon: "⚙️", label: "ตั้งค่า & ข้อมูล", desc: "นำเข้า / ส่งออก / โปรไฟล์" },
+  ];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      {items.map(it => (
+        <button key={it.id} onClick={() => onNavigate(it.id)}
+          style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 14px", textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 28 }}>{it.icon}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)" }}>{it.label}</span>
+          <span style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1.4 }}>{it.desc}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function DataBackupSection({ onExport, onImport }) {
   const fileRef = useRef(null);
   const [status, setStatus] = useState(() =>
@@ -2580,6 +2739,7 @@ function MainApp({ user, darkMode, setDarkMode, onLogout, onEditProfile }) {
   const savCatKey     = `sf_savcats_${user.id}`;
 
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [moreSubTab, setMoreSubTab] = useState(null);
   const [months, setMonths] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
@@ -2784,7 +2944,7 @@ Use 0 for any price you can't find.`
           </div>
           <div style={{ flex: 1, padding: "4px 12px" }}>
             {TABS.map(t => (
-              <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              <button key={t.id} onClick={() => { setActiveTab(t.id); setMoreSubTab(null); }} style={{
                 width: "100%", display: "flex", alignItems: "center", gap: 10,
                 padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer", marginBottom: 2,
                 background: activeTab === t.id ? "#E6F1FB" : "transparent",
@@ -2953,30 +3113,39 @@ Use 0 for any price you can't find.`
             {/* Content */}
             <div style={{ padding: "0 16px" }}>
               {activeTab === "dashboard"  && <Dashboard months={yearMonths} year={selectedYear} allYears={allYears} allMonths={months} />}
-              {activeTab === "summary"   && (currentMonth ? <SummaryTab month={currentMonth} bonusData={bonusData} expenseCats={expenseCats} savingsCats={savingsCats} /> : <EmptyState icon="📋" />)}
-              {activeTab === "payslip"   && (currentMonth ? <PayslipTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="📋" />)}
+              {activeTab === "income"    && (currentMonth ? <IncomeTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="💰" />)}
               {activeTab === "calendar"  && (currentMonth ? <WorkCalendarTab month={currentMonth} onChange={updateMonth} /> : <EmptyState icon="🗓" />)}
-              {activeTab === "ot"        && (currentMonth ? <OTCalendarTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="⏰" />)}
-              {activeTab === "expenses" && (currentMonth ? <ExpensesTab month={currentMonth} onChange={updateMonth} expenseCats={expenseCats} onUpdateExpCats={setExpenseCats} /> : <EmptyState icon="🧾" />)}
-              {activeTab === "savings" && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} savingsCats={savingsCats} onUpdateSavCats={setSavingsCats} /> : <EmptyState icon="🏦" />)}
-              {activeTab === "investments" && <InvestmentsTab liveData={liveData} refreshLive={refreshLive} />}
-              {activeTab === "tax"         && <TaxTab months={yearMonths} taxDeductions={taxDeductions} onChangeTaxDeductions={setTaxDeductions} />}
-              {activeTab === "bonus"       && <BonusTab bonusData={bonusData} onChange={setBonusData} allYears={allYears} />}
-              {activeTab === "annual"      && <AnnualExpensesTab annualExp={annualExp} onChange={setAnnualExp} />}
-              {activeTab === "settings"    && <SettingsTab
-                settings={settings}
-                onChange={setSettings}
-                onExport={() => exportUserData(user, months, bonusData, annualExp, taxDeductions, settings, expenseCats, savingsCats)}
-                onImport={(data) => {
-                  if (data.months)       { setMonths(data.months); localStorage.setItem(storageKey, JSON.stringify(data.months)); }
-                  if (data.bonusData)    { setBonusData(data.bonusData); localStorage.setItem(bonusKey, JSON.stringify(data.bonusData)); }
-                  if (data.annualExp)    { setAnnualExp(data.annualExp); localStorage.setItem(annualKey, JSON.stringify(data.annualExp)); }
-                  if (data.taxDeductions){ setTaxDeductions(data.taxDeductions); localStorage.setItem(taxDedKey, JSON.stringify(data.taxDeductions)); }
-                  if (data.settings)     { setSettings(data.settings); localStorage.setItem(SETTINGS_KEY(user.id), JSON.stringify(data.settings)); }
-                  if (data.expenseCats)  { setExpenseCats(data.expenseCats); localStorage.setItem(expCatKey, JSON.stringify(data.expenseCats)); }
-                  if (data.savingsCats)  { setSavingsCats(data.savingsCats); localStorage.setItem(savCatKey, JSON.stringify(data.savingsCats)); }
-                }}
-              />}
+              {activeTab === "expenses"  && (currentMonth ? <ExpensesTab month={currentMonth} onChange={updateMonth} expenseCats={expenseCats} onUpdateExpCats={setExpenseCats} /> : <EmptyState icon="🧾" />)}
+              {activeTab === "savings"   && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} savingsCats={savingsCats} onUpdateSavCats={setSavingsCats} /> : <EmptyState icon="🏦" />)}
+              {activeTab === "more" && (
+                moreSubTab === null
+                  ? <MoreTab onNavigate={sub => setMoreSubTab(sub)} />
+                  : <div>
+                      <button onClick={() => setMoreSubTab(null)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#378ADD", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 14 }}>
+                        ← กลับ
+                      </button>
+                      {moreSubTab === "summary"     && (currentMonth ? <SummaryTab month={currentMonth} bonusData={bonusData} expenseCats={expenseCats} savingsCats={savingsCats} /> : <EmptyState icon="📋" />)}
+                      {moreSubTab === "bonus"       && <BonusTab bonusData={bonusData} onChange={setBonusData} allYears={allYears} />}
+                      {moreSubTab === "annual"      && <AnnualExpensesTab annualExp={annualExp} onChange={setAnnualExp} />}
+                      {moreSubTab === "investments" && <InvestmentsTab liveData={liveData} refreshLive={refreshLive} />}
+                      {moreSubTab === "tax"         && <TaxTab months={yearMonths} taxDeductions={taxDeductions} onChangeTaxDeductions={setTaxDeductions} />}
+                      {moreSubTab === "settings"    && <SettingsTab
+                        settings={settings}
+                        onChange={setSettings}
+                        onExport={() => exportUserData(user, months, bonusData, annualExp, taxDeductions, settings, expenseCats, savingsCats)}
+                        onImport={(data) => {
+                          if (data.months)       { setMonths(data.months); localStorage.setItem(storageKey, JSON.stringify(data.months)); }
+                          if (data.bonusData)    { setBonusData(data.bonusData); localStorage.setItem(bonusKey, JSON.stringify(data.bonusData)); }
+                          if (data.annualExp)    { setAnnualExp(data.annualExp); localStorage.setItem(annualKey, JSON.stringify(data.annualExp)); }
+                          if (data.taxDeductions){ setTaxDeductions(data.taxDeductions); localStorage.setItem(taxDedKey, JSON.stringify(data.taxDeductions)); }
+                          if (data.settings)     { setSettings(data.settings); localStorage.setItem(SETTINGS_KEY(user.id), JSON.stringify(data.settings)); }
+                          if (data.expenseCats)  { setExpenseCats(data.expenseCats); localStorage.setItem(expCatKey, JSON.stringify(data.expenseCats)); }
+                          if (data.savingsCats)  { setSavingsCats(data.savingsCats); localStorage.setItem(savCatKey, JSON.stringify(data.savingsCats)); }
+                        }}
+                      />}
+                    </div>
+              )}
             </div>
           </div>
         </main>
@@ -2984,7 +3153,7 @@ Use 0 for any price you can't find.`
         {/* ── Bottom Nav (mobile only) ── */}
         <nav className="sf-bottom-nav">
           {TABS.map(t => (
-            <button key={t.id} className="sf-nav-btn" onClick={() => setActiveTab(t.id)}>
+            <button key={t.id} className="sf-nav-btn" onClick={() => { setActiveTab(t.id); setMoreSubTab(null); }}>
               <span style={{ fontSize: 22 }}>{t.icon}</span>
               <span style={{
                 fontSize: 9, fontWeight: activeTab === t.id ? 600 : 400,
