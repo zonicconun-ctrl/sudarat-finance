@@ -832,10 +832,28 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
             )}
           </div>
         </div>
-        {renderRow("อัตราค่าข้าว / วัน (฿)", "mealRatePerDay")}
-        {renderRow(`ค่าข้าว (${workDays} วัน)`, "meal_ro", { readOnly: true, value: actualMeal })}
-        {renderRow("เบี้ยขยัน (เต็มเดือน)", "diligenceBonus")}
-        {renderRow(leaveCount > 0 ? `เบี้ยขยัน (ลา ${leaveCount} วัน → หัก)` : "เบี้ยขยัน (ได้เต็ม)", "dil_ro", { readOnly: true, value: actualDiligence })}
+        {/* ค่าข้าว: input + ผลคำนวณในแถวเดียว */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>ค่าข้าว / วัน (฿)</div>
+            <div style={{ fontSize: 11, color: "#1D9E75", marginTop: 2 }}>
+              รวม {workDays} วัน = <strong>฿{fmt(actualMeal)}</strong>
+            </div>
+          </div>
+          <input type="number" value={month.mealRatePerDay ?? 0} onChange={e => set("mealRatePerDay", e.target.value)} style={incInputStyle} />
+        </div>
+        {/* เบี้ยขยัน: input + ผลจริงในแถวเดียว */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>เบี้ยขยัน (บาท/เดือน)</div>
+            <div style={{ fontSize: 11, marginTop: 2, color: leaveCount > 0 ? "#D85A30" : "#1D9E75" }}>
+              {leaveCount > 0
+                ? `ลา ${leaveCount} วัน → ได้จริง ฿${fmt(actualDiligence)}`
+                : `ไม่มีการลา → ได้เต็ม ฿${fmt(actualDiligence)}`}
+            </div>
+          </div>
+          <input type="number" value={month.diligenceBonus ?? 0} onChange={e => set("diligenceBonus", e.target.value)} style={incInputStyle} />
+        </div>
         {renderRow("หัก ประกันสังคม", "sso")}
         {renderRow("หัก กองทุนสำรองเลี้ยงชีพ", "providentFund")}
       </div>
