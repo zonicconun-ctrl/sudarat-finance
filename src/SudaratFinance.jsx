@@ -752,7 +752,7 @@ function PayslipTab({ month, onChange, bonusData = {} }) {
 // ─────────────────────────────────────────────────────────
 //  IncomeTab  — รายรับรวมหน้าเดียว (เงินเดือน + OT + โบนัส)
 // ─────────────────────────────────────────────────────────
-function IncomeTab({ month, onChange, bonusData = {} }) {
+function IncomeTab({ month, onChange, bonusData = {}, prevMonth = null }) {
   const { ot, gross, net, deductions, workDays, leaveCount, actualMeal, actualDiligence, quarterlyBonusAmt } = calcPayslip(month, bonusData);
 
   function set(field, val) {
@@ -760,7 +760,11 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
   }
 
   const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
-  const remaining = net - totalExpenses;
+  // คงเหลือ = เงินเดือนที่รับจริงเดือนนี้ (= net เดือนก่อน) - รายจ่ายเดือนนี้
+  const prevNet = prevMonth ? calcPayslip(prevMonth, bonusData).net : null;
+  const cashInHand = prevNet !== null ? prevNet : net; // ถ้าไม่มีข้อมูลเดือนก่อน fallback ใช้เดือนนี้
+  const remaining = cashInHand - totalExpenses;
+  const hasPrevData = prevNet !== null;
 
   const incInputStyle = {
     width: 120, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)",
@@ -796,18 +800,31 @@ function IncomeTab({ month, onChange, bonusData = {} }) {
         <div style={{ background: "linear-gradient(145deg,#185FA5,#2D7DD2)", borderRadius: 14, padding: "14px 10px", textAlign: "center", color: "#fff", boxShadow: "0 3px 10px rgba(24,95,165,0.3)" }}>
           <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>💰 รายรับรวม</div>
           <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.2 }}>฿{fmt(gross)}</div>
+          <div style={{ fontSize: 9, opacity: 0.75, marginTop: 3 }}>จ่ายวันที่ 30 เดือนหน้า</div>
         </div>
         {/* รับสุทธิ — เขียวเทา */}
         <div style={{ background: "linear-gradient(145deg,#0F6E56,#1D9E75)", borderRadius: 14, padding: "14px 10px", textAlign: "center", color: "#fff", boxShadow: "0 3px 10px rgba(29,158,117,0.3)" }}>
           <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>✂️ รับสุทธิ</div>
           <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.2 }}>฿{fmt(net)}</div>
+          <div style={{ fontSize: 9, opacity: 0.75, marginTop: 3 }}>หลังหัก SSO/กองทุน</div>
         </div>
-        {/* คงเหลือ — ส้ม/แดง ถ้าติดลบ */}
+        {/* คงเหลือ = เงินเดือนก่อน - รายจ่ายเดือนนี้ */}
         <div style={{ background: remaining >= 0 ? "linear-gradient(145deg,#B87A00,#EF9F27)" : "linear-gradient(145deg,#A83220,#D85A30)", borderRadius: 14, padding: "14px 10px", textAlign: "center", color: "#fff", boxShadow: remaining >= 0 ? "0 3px 10px rgba(239,159,39,0.35)" : "0 3px 10px rgba(216,90,48,0.35)" }}>
-          <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>🏦 คงเหลือ</div>
+          <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>🏦 คงเหลือเดือนนี้</div>
           <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.2 }}>{remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}</div>
+          <div style={{ fontSize: 9, opacity: 0.75, marginTop: 3 }}>
+            {hasPrevData ? `เงินเดือนก่อน - รายจ่ายนี้` : `(ยังไม่มีข้อมูลเดือนก่อน)`}
+          </div>
         </div>
       </div>
+
+      {/* แจ้งเตือน cash flow offset */}
+      {!hasPrevData && (
+        <div style={{ background: "#FEF3E2", border: "1px solid #EF9F27", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#8A5C00", lineHeight: 1.5 }}>
+          💡 <strong>หมายเหตุ:</strong> ยังไม่มีข้อมูลเดือนก่อนหน้า ตัวเลข "คงเหลือ" ใช้เงินเดือนนี้แทนชั่วคราว
+          เพิ่มข้อมูลเดือนก่อนหน้าเพื่อให้คำนวณ cash flow ได้ถูกต้อง
+        </div>
+      )}
 
       {/* ── เงินเดือน & การหัก ── */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
@@ -1058,11 +1075,14 @@ function ExpensesTab({ month, onChange, expenseCats = EXPENSE_CATS, onUpdateExpC
   );
 }
 
-function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CATS, onUpdateSavCats }) {
+function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CATS, onUpdateSavCats, prevMonth = null }) {
   const total = savingsCats.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
   const { net } = calcPayslip(month, bonusData);
   const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
-  const remaining = net - totalExpenses;
+  // cash flow: ใช้ net เดือนก่อน (เงินที่รับจริงเดือนนี้) ถ้ามีข้อมูล
+  const prevNet = prevMonth ? calcPayslip(prevMonth, bonusData).net : null;
+  const cashInHand = prevNet !== null ? prevNet : net;
+  const remaining = cashInHand - totalExpenses;
   const afterSavings = remaining - total;
   const savingsPctOfRemaining = remaining > 0 ? (total / remaining) * 100 : 0;
   const [editingCat, setEditingCat] = useState(null);
@@ -1088,7 +1108,12 @@ function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CAT
 
       {/* คงเหลือ banner */}
       <div style={{ background: remaining >= 0 ? "#E6F7F2" : "#FDEEE9", border: `1.5px solid ${remaining >= 0 ? "#1D9E75" : "#D85A30"}`, borderRadius: 12, padding: "14px 16px" }}>
-        <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 4 }}>💵 คงเหลือหลังหักค่าใช้จ่าย (รับสุทธิ ฿{fmt(net)} − รายจ่าย ฿{fmt(totalExpenses)})</div>
+        <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 4 }}>
+          💵 คงเหลือหลังหักค่าใช้จ่าย
+          {prevNet !== null
+            ? ` (เงินที่รับเดือนนี้ ฿${fmt(prevNet)} − รายจ่าย ฿${fmt(totalExpenses)})`
+            : ` (รับสุทธิ ฿${fmt(net)} − รายจ่าย ฿${fmt(totalExpenses)})`}
+        </div>
         <div style={{ fontSize: 26, fontWeight: 800, color: remaining >= 0 ? "#1D9E75" : "#D85A30" }}>
           {remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}
         </div>
@@ -2863,6 +2888,11 @@ function MainApp({ user, darkMode, setDarkMode, onLogout, onEditProfile }) {
   );
   const currentMonth = yearMonths.find(m => m.monthIdx === selectedMonthIdx) || null;
 
+  // หาข้อมูลเดือนก่อนหน้า (เงินเดือนที่รับจริงในเดือนปัจจุบัน)
+  const prevMonthIdx = selectedMonthIdx === 0 ? 11 : selectedMonthIdx - 1;
+  const prevMonthYear = selectedMonthIdx === 0 ? selectedYear - 1 : selectedYear;
+  const prevMonth = months.find(m => m.monthIdx === prevMonthIdx && (m.year || 2026) === prevMonthYear) || null;
+
   const [liveData, setLiveData] = useState({ lastUpdated: null });
   const [adding, setAdding] = useState(false);
   const [addingYear, setAddingYear] = useState(false);
@@ -3215,12 +3245,12 @@ Use 0 for any price you can't find.`
             {/* Content */}
             <div style={{ padding: "0 16px" }}>
               {activeTab === "dashboard"  && <Dashboard months={yearMonths} year={selectedYear} allYears={allYears} allMonths={months} />}
-              {activeTab === "income"    && (currentMonth ? <IncomeTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} /> : <EmptyState icon="💰" />)}
+              {activeTab === "income"    && (currentMonth ? <IncomeTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} prevMonth={prevMonth} /> : <EmptyState icon="💰" />)}
               {activeTab === "calendar"  && (currentMonth
                 ? <CalendarShell month={currentMonth} onChange={updateMonth} bonusData={bonusData} />
                 : <EmptyState icon="🗓" />)}
               {activeTab === "expenses"  && (currentMonth ? <ExpensesTab month={currentMonth} onChange={updateMonth} expenseCats={expenseCats} onUpdateExpCats={setExpenseCats} /> : <EmptyState icon="🧾" />)}
-              {activeTab === "savings"   && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} savingsCats={savingsCats} onUpdateSavCats={setSavingsCats} /> : <EmptyState icon="🏦" />)}
+              {activeTab === "savings"   && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} savingsCats={savingsCats} onUpdateSavCats={setSavingsCats} prevMonth={prevMonth} /> : <EmptyState icon="🏦" />)}
               {activeTab === "more" && (
                 moreSubTab === null
                   ? <MoreTab onNavigate={sub => setMoreSubTab(sub)} />
@@ -3229,7 +3259,7 @@ Use 0 for any price you can't find.`
                         style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#378ADD", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 14 }}>
                         ← กลับ
                       </button>
-                      {moreSubTab === "summary"     && (currentMonth ? <SummaryTab month={currentMonth} bonusData={bonusData} expenseCats={expenseCats} savingsCats={savingsCats} /> : <EmptyState icon="📋" />)}
+                      {moreSubTab === "summary"     && (currentMonth ? <SummaryTab month={currentMonth} bonusData={bonusData} expenseCats={expenseCats} savingsCats={savingsCats} prevMonth={prevMonth} /> : <EmptyState icon="📋" />)}
                       {moreSubTab === "bonus"       && <BonusTab bonusData={bonusData} onChange={setBonusData} allYears={allYears} />}
                       {moreSubTab === "annual"      && <AnnualExpensesTab annualExp={annualExp} onChange={setAnnualExp} />}
                       {moreSubTab === "investments" && <InvestmentsTab liveData={liveData} refreshLive={refreshLive} />}
