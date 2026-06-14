@@ -1078,13 +1078,11 @@ function ExpensesTab({ month, onChange, expenseCats = EXPENSE_CATS, onUpdateExpC
 function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CATS, onUpdateSavCats, prevMonth = null }) {
   const total = savingsCats.reduce((a, c) => a + (+month.savings?.[c.key] || 0), 0);
   const { net } = calcPayslip(month, bonusData);
-  const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
-  // cash flow: ใช้ net เดือนก่อน (เงินที่รับจริงเดือนนี้) ถ้ามีข้อมูล
+  // cash flow: ใช้ net เดือนก่อน (เงินที่รับจริงเดือนนี้)
   const prevNet = prevMonth ? calcPayslip(prevMonth, bonusData).net : null;
   const cashInHand = prevNet !== null ? prevNet : net;
-  const remaining = cashInHand - totalExpenses;
-  const afterSavings = remaining - total;
-  const savingsPctOfRemaining = remaining > 0 ? (total / remaining) * 100 : 0;
+  // ยังไม่ได้แบ่ง = เงินที่มี - รวมทุกก้อน
+  const unallocated = cashInHand - total;
   const [editingCat, setEditingCat] = useState(null);
 
   function setSav(key, val) {
@@ -1106,71 +1104,35 @@ function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CAT
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-      {/* คงเหลือ banner */}
-      <div style={{ background: remaining >= 0 ? "#E6F7F2" : "#FDEEE9", border: `1.5px solid ${remaining >= 0 ? "#1D9E75" : "#D85A30"}`, borderRadius: 12, padding: "14px 16px" }}>
-        <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 4 }}>
-          💵 คงเหลือหลังหักค่าใช้จ่าย
-          {prevNet !== null
-            ? ` (เงินที่รับเดือนนี้ ฿${fmt(prevNet)} − รายจ่าย ฿${fmt(totalExpenses)})`
-            : ` (รับสุทธิ ฿${fmt(net)} − รายจ่าย ฿${fmt(totalExpenses)})`}
+      {/* Income banner */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <div style={{ background: "linear-gradient(145deg,#0F6E56,#1D9E75)", borderRadius: 14, padding: "14px 12px", color: "#fff", textAlign: "center", boxShadow: "0 3px 10px rgba(29,158,117,0.3)" }}>
+          <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>💰 เงินที่รับเดือนนี้</div>
+          <div style={{ fontSize: 17, fontWeight: 800 }}>฿{fmt(cashInHand)}</div>
+          <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>{prevNet !== null ? "จากเงินเดือนก่อน" : "เดือนปัจจุบัน"}</div>
         </div>
-        <div style={{ fontSize: 26, fontWeight: 800, color: remaining >= 0 ? "#1D9E75" : "#D85A30" }}>
-          {remaining >= 0 ? "" : "-"}฿{fmt(Math.abs(remaining))}
-        </div>
-        {remaining > 0 && (
-          <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-            {[10, 15, 20, 30].map(p => (
-              <span key={p} style={{ fontSize: 11, color: "var(--text3)" }}>
-                เป้า {p}% = ฿{fmt(remaining * p / 100)}
-              </span>
-            ))}
+        <div style={{ background: unallocated === 0 ? "linear-gradient(145deg,#185FA5,#2D7DD2)" : unallocated > 0 ? "linear-gradient(145deg,#B87A00,#EF9F27)" : "linear-gradient(145deg,#A83220,#D85A30)", borderRadius: 14, padding: "14px 12px", color: "#fff", textAlign: "center", boxShadow: "0 3px 10px rgba(0,0,0,0.15)" }}>
+          <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>
+            {unallocated === 0 ? "✅ แบ่งครบแล้ว" : unallocated > 0 ? "⏳ ยังไม่ได้แบ่ง" : "⚠️ แบ่งเกิน"}
           </div>
-        )}
+          <div style={{ fontSize: 17, fontWeight: 800 }}>{unallocated === 0 ? "฿0" : `${unallocated > 0 ? "" : "-"}฿${fmt(Math.abs(unallocated))}`}</div>
+          <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>แบ่งไปแล้ว ฿{fmt(total)}</div>
+        </div>
       </div>
 
       {editingCat && <EditCatModal cat={editingCat} onSave={(l, c) => saveEdit(editingCat.key, l, c)} onClose={() => setEditingCat(null)} />}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)" }}>บัญชีออมทรัพย์</span>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#1D9E75" }}>฿{fmt(total)} ({fmtDec(savingsPctOfRemaining, 1)}% ของคงเหลือ)</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)" }}>แบ่งก้อนเงิน</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#1D9E75" }}>฿{fmt(total)} / ฿{fmt(cashInHand)}</span>
         </div>
         {savingsCats.map(c => (
-          <CatRow key={c.key} cat={c} value={month.savings?.[c.key] ?? 0} max={remaining > 0 ? remaining : net * 0.3}
+          <CatRow key={c.key} cat={c} value={month.savings?.[c.key] ?? 0} max={cashInHand}
             onValue={v => setSav(c.key, v)}
             onEdit={() => setEditingCat(c)}
             onDelete={() => deleteCat(c.key)} />
         ))}
-        {onUpdateSavCats && <AddCatRow onAdd={addCat} placeholder="เช่น กองทุน RMF, เงินสำรอง..." />}
-      </div>
-      <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
-        <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 6 }}>เป้าหมายการออม (จากคงเหลือ)</div>
-        {[
-          { label: "เป้า 10%", target: remaining * 0.1 },
-          { label: "เป้า 20%", target: remaining * 0.2 },
-          { label: "เป้า 30%", target: remaining * 0.3 },
-          { label: "ออมได้จริง", target: total, bold: true },
-        ].map(r => (
-          <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-            <span style={{ fontSize: 12, color: "var(--text2)", fontWeight: r.bold ? 500 : 400 }}>{r.label}</span>
-            <span style={{ fontSize: 12, fontWeight: r.bold ? 600 : 400, color: r.bold ? "#1D9E75" : "var(--text2)" }}>฿{fmt(r.target)}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* เหลือใช้จ่ายหลังออม */}
-      <div style={{
-        background: afterSavings >= 0 ? "#E6F1FB" : "#FDEEE9",
-        border: `1.5px solid ${afterSavings >= 0 ? "#378ADD" : "#D85A30"}`,
-        borderRadius: 12, padding: "14px 16px",
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-      }}>
-        <div>
-          <div style={{ fontSize: 12, color: "var(--text2)" }}>🎯 เหลือใช้จ่ายหลังออม</div>
-          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>ออม {fmtDec(savingsPctOfRemaining, 1)}% ของคงเหลือ</div>
-        </div>
-        <span style={{ fontSize: 22, fontWeight: 800, color: afterSavings >= 0 ? "#378ADD" : "#D85A30" }}>
-          {afterSavings >= 0 ? "" : "-"}฿{fmt(Math.abs(afterSavings))}
-        </span>
+        {onUpdateSavCats && <AddCatRow onAdd={addCat} placeholder="เช่น ค่าใช้จ่าย, เงินเก็บ, กองทุน..." />}
       </div>
 
     </div>
