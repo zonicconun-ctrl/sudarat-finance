@@ -1800,10 +1800,26 @@ const OT_TYPES = [
 
 const OT_MULT = { ot1: 1, ot15: 1.5, ot2: 2, ot25: 2.5, ot3: 3 };
 
+const OT_TYPE_KEY = "sf_last_ot_type";
+const OT_HOURS_KEY = "sf_last_ot_hours";
+
 function OTCalendarTab({ month, onChange, bonusData = {} }) {
   const [selectedDays, setSelectedDays] = useState([]);
-  const [otType, setOtType] = useState("ot15");
-  const [hours, setHours] = useState(2);
+  const [otType, setOtType] = useState(() => {
+    try { return localStorage.getItem(OT_TYPE_KEY) || "ot15"; } catch { return "ot15"; }
+  });
+  const [hours, setHours] = useState(() => {
+    try { return parseFloat(localStorage.getItem(OT_HOURS_KEY) || "2") || 2; } catch { return 2; }
+  });
+
+  function setOtTypeAndSave(t) {
+    setOtType(t);
+    try { localStorage.setItem(OT_TYPE_KEY, t); } catch {}
+  }
+  function setHoursAndSave(h) {
+    setHours(h);
+    try { localStorage.setItem(OT_HOURS_KEY, String(h)); } catch {}
+  }
 
   const monthIdx = month.monthIdx;
   const year = month.year || new Date().getFullYear();
@@ -1931,7 +1947,7 @@ function OTCalendarTab({ month, onChange, bonusData = {} }) {
         <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)", marginBottom: 10 }}>เลือกประเภท OT และชั่วโมง</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           {OT_TYPES.map(t => (
-            <button key={t.key} onClick={() => setOtType(t.key)} style={{
+            <button key={t.key} onClick={() => setOtTypeAndSave(t.key)} style={{
               padding: "6px 16px", borderRadius: 20, border: "2px solid",
               borderColor: otType === t.key ? t.color : "var(--border)",
               background: otType === t.key ? t.bg : "transparent",
@@ -1943,12 +1959,12 @@ function OTCalendarTab({ month, onChange, bonusData = {} }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13, color: "var(--text2)" }}>จำนวนชั่วโมง:</span>
-          <button onClick={() => setHours(h => Math.max(0.5, h - 0.5))} style={{
+          <button onClick={() => setHoursAndSave(Math.max(0.5, hours - 0.5))} style={{
             width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border)",
             background: "var(--bg2)", color: "var(--text1)", fontSize: 18, cursor: "pointer"
           }}>−</button>
           <span style={{ fontSize: 18, fontWeight: 600, color: "var(--text1)", minWidth: 32, textAlign: "center" }}>{hours}</span>
-          <button onClick={() => setHours(h => h + 0.5)} style={{
+          <button onClick={() => setHoursAndSave(hours + 0.5)} style={{
             width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border)",
             background: "var(--bg2)", color: "var(--text1)", fontSize: 18, cursor: "pointer"
           }}>+</button>
@@ -2725,7 +2741,7 @@ function SettingsTab({ settings, onChange, onExport, onImport }) {
 // ─────────────────────────────────────────────────────────
 //  CalendarShell  — sub-tab: วันทำงาน | OT
 // ─────────────────────────────────────────────────────────
-function CalendarShell({ month, onChange, bonusData }) {
+function CalendarShell({ month, onChange, bonusData, onPrev, onNext, canPrev, canNext }) {
   const [sub, setSub] = useState("work");
   const tabs = [
     { id: "work", label: "🗓 วันทำงาน" },
@@ -2733,6 +2749,26 @@ function CalendarShell({ month, onChange, bonusData }) {
   ];
   return (
     <div>
+      {/* Month nav header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px" }}>
+        <button onClick={onPrev} disabled={!canPrev} style={{
+          width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)",
+          background: canPrev ? "var(--bg2)" : "transparent", color: canPrev ? "var(--text1)" : "var(--border)",
+          fontSize: 18, cursor: canPrev ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center"
+        }}>‹</button>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text1)" }}>
+            {MONTHS[month.monthIdx]}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>{month.year || 2026}</div>
+        </div>
+        <button onClick={onNext} disabled={!canNext} style={{
+          width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)",
+          background: canNext ? "var(--bg2)" : "transparent", color: canNext ? "var(--text1)" : "var(--border)",
+          fontSize: 18, cursor: canNext ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center"
+        }}>›</button>
+      </div>
+
       {/* sub-tab pills */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         {tabs.map(t => (
@@ -2892,6 +2928,28 @@ function MainApp({ user, darkMode, setDarkMode, onLogout, onEditProfile }) {
   const prevMonthIdx = selectedMonthIdx === 0 ? 11 : selectedMonthIdx - 1;
   const prevMonthYear = selectedMonthIdx === 0 ? selectedYear - 1 : selectedYear;
   const prevMonth = months.find(m => m.monthIdx === prevMonthIdx && (m.year || 2026) === prevMonthYear) || null;
+
+  // ─── Month navigation (ใช้ใน CalendarShell) ───
+  // เรียงเดือนทั้งหมดที่มีข้อมูล ตามปี+เดือน
+  const sortedMonths = [...months].sort((a, b) =>
+    ((a.year || 2026) * 12 + a.monthIdx) - ((b.year || 2026) * 12 + b.monthIdx)
+  );
+  const currentMonthKey = selectedYear * 12 + selectedMonthIdx;
+  const currentSortedIdx = sortedMonths.findIndex(m => (m.year || 2026) * 12 + m.monthIdx === currentMonthKey);
+  const canGoPrev = currentSortedIdx > 0;
+  const canGoNext = currentSortedIdx < sortedMonths.length - 1;
+  function goToPrevMonth() {
+    if (!canGoPrev) return;
+    const m = sortedMonths[currentSortedIdx - 1];
+    setSelectedYear(m.year || 2026);
+    setSelectedMonthIdx(m.monthIdx);
+  }
+  function goToNextMonth() {
+    if (!canGoNext) return;
+    const m = sortedMonths[currentSortedIdx + 1];
+    setSelectedYear(m.year || 2026);
+    setSelectedMonthIdx(m.monthIdx);
+  }
 
   const [liveData, setLiveData] = useState({ lastUpdated: null });
   const [adding, setAdding] = useState(false);
@@ -3247,7 +3305,8 @@ Use 0 for any price you can't find.`
               {activeTab === "dashboard"  && <Dashboard months={yearMonths} year={selectedYear} allYears={allYears} allMonths={months} />}
               {activeTab === "income"    && (currentMonth ? <IncomeTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} prevMonth={prevMonth} /> : <EmptyState icon="💰" />)}
               {activeTab === "calendar"  && (currentMonth
-                ? <CalendarShell month={currentMonth} onChange={updateMonth} bonusData={bonusData} />
+                ? <CalendarShell month={currentMonth} onChange={updateMonth} bonusData={bonusData}
+                    onPrev={goToPrevMonth} onNext={goToNextMonth} canPrev={canGoPrev} canNext={canGoNext} />
                 : <EmptyState icon="🗓" />)}
               {activeTab === "expenses"  && (currentMonth ? <ExpensesTab month={currentMonth} onChange={updateMonth} expenseCats={expenseCats} onUpdateExpCats={setExpenseCats} /> : <EmptyState icon="🧾" />)}
               {activeTab === "savings"   && (currentMonth ? <SavingsTab month={currentMonth} onChange={updateMonth} bonusData={bonusData} savingsCats={savingsCats} onUpdateSavCats={setSavingsCats} prevMonth={prevMonth} /> : <EmptyState icon="🏦" />)}
