@@ -1081,8 +1081,11 @@ function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CAT
   // cash flow: ใช้ net เดือนก่อน (เงินที่รับจริงเดือนนี้)
   const prevNet = prevMonth ? calcPayslip(prevMonth, bonusData).net : null;
   const cashInHand = prevNet !== null ? prevNet : net;
-  // ยังไม่ได้แบ่ง = เงินที่มี - รวมทุกก้อน
-  const unallocated = cashInHand - total;
+  // หักค่าใช้จ่ายก่อน แล้วค่อยออม
+  const totalExpenses = Object.values(month.expenses || {}).reduce((a, v) => a + (+v || 0), 0);
+  const afterExpenses = cashInHand - totalExpenses;
+  // ยังไม่ได้แบ่ง = เหลือหลังค่าใช้จ่าย - รวมก้อนออม
+  const unallocated = afterExpenses - total;
   const [editingCat, setEditingCat] = useState(null);
 
   function setSav(key, val) {
@@ -1113,10 +1116,10 @@ function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CAT
         </div>
         <div style={{ background: unallocated === 0 ? "linear-gradient(145deg,#185FA5,#2D7DD2)" : unallocated > 0 ? "linear-gradient(145deg,#B87A00,#EF9F27)" : "linear-gradient(145deg,#A83220,#D85A30)", borderRadius: 14, padding: "14px 12px", color: "#fff", textAlign: "center", boxShadow: "0 3px 10px rgba(0,0,0,0.15)" }}>
           <div style={{ fontSize: 10, opacity: 0.85, marginBottom: 4 }}>
-            {unallocated === 0 ? "✅ แบ่งครบแล้ว" : unallocated > 0 ? "⏳ ยังไม่ได้แบ่ง" : "⚠️ แบ่งเกิน"}
+            {unallocated === 0 ? "✅ ออมครบแล้ว" : unallocated > 0 ? "⏳ ยังไม่ได้ออม" : "⚠️ ออมเกิน"}
           </div>
           <div style={{ fontSize: 17, fontWeight: 800 }}>{unallocated === 0 ? "฿0" : `${unallocated > 0 ? "" : "-"}฿${fmt(Math.abs(unallocated))}`}</div>
-          <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>แบ่งไปแล้ว ฿{fmt(total)}</div>
+          <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>หลังหักค่าใช้จ่าย ฿{fmt(afterExpenses)}</div>
         </div>
       </div>
 
@@ -1126,18 +1129,32 @@ function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CAT
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)" }}>แบ่งก้อนเงิน</span>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#1D9E75" }}>฿{fmt(total)} / ฿{fmt(cashInHand)}</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#1D9E75" }}>฿{fmt(total)} / ฿{fmt(afterExpenses)}</span>
         </div>
 
-        {/* Starting balance row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", marginBottom: 6, background: "#E6F7F2", borderRadius: 8 }}>
+        {/* Starting balance */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", marginBottom: 4, background: "#E6F7F2", borderRadius: 8 }}>
           <span style={{ fontSize: 12, color: "#0F6E56", fontWeight: 600 }}>💰 เริ่มต้น</span>
           <span style={{ fontSize: 14, fontWeight: 700, color: "#0F6E56" }}>฿{fmt(cashInHand)}</span>
         </div>
 
+        {/* Expense deduction row */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "#FDEEE9", borderRadius: 8 }}>
+            <span style={{ fontSize: 12, color: "#A83220", fontWeight: 500 }}>🧾 หักค่าใช้จ่ายประจำเดือน</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#D85A30" }}>-฿{fmt(totalExpenses)}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, marginTop: 3 }}>
+            <div style={{ flex: 1, height: 1, background: "var(--border)", marginLeft: 14 }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: afterExpenses >= 0 ? "#185FA5" : "#D85A30" }}>
+              เหลือออม {afterExpenses >= 0 ? "" : "-"}฿{fmt(Math.abs(afterExpenses))}
+            </span>
+          </div>
+        </div>
+
         {/* Each bucket with running balance */}
         {(() => {
-          let running = cashInHand;
+          let running = afterExpenses;
           return savingsCats.map(c => {
             const val = +(month.savings?.[c.key] || 0);
             running -= val;
