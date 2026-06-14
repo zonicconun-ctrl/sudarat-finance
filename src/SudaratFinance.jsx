@@ -1121,17 +1121,51 @@ function SavingsTab({ month, onChange, bonusData = {}, savingsCats = SAVINGS_CAT
       </div>
 
       {editingCat && <EditCatModal cat={editingCat} onSave={(l, c) => saveEdit(editingCat.key, l, c)} onClose={() => setEditingCat(null)} />}
+
+      {/* Waterfall allocation */}
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)" }}>แบ่งก้อนเงิน</span>
           <span style={{ fontSize: 13, fontWeight: 500, color: "#1D9E75" }}>฿{fmt(total)} / ฿{fmt(cashInHand)}</span>
         </div>
-        {savingsCats.map(c => (
-          <CatRow key={c.key} cat={c} value={month.savings?.[c.key] ?? 0} max={cashInHand}
-            onValue={v => setSav(c.key, v)}
-            onEdit={() => setEditingCat(c)}
-            onDelete={() => deleteCat(c.key)} />
-        ))}
+
+        {/* Starting balance row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", marginBottom: 6, background: "#E6F7F2", borderRadius: 8 }}>
+          <span style={{ fontSize: 12, color: "#0F6E56", fontWeight: 600 }}>💰 เริ่มต้น</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#0F6E56" }}>฿{fmt(cashInHand)}</span>
+        </div>
+
+        {/* Each bucket with running balance */}
+        {(() => {
+          let running = cashInHand;
+          return savingsCats.map(c => {
+            const val = +(month.savings?.[c.key] || 0);
+            running -= val;
+            const afterThis = running;
+            return (
+              <div key={c.key} style={{ marginBottom: 8 }}>
+                {/* input row */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: "var(--text2)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
+                  <button onClick={() => setEditingCat(c)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "var(--text3)", padding: "0 2px" }}>✏️</button>
+                  <button onClick={() => deleteCat(c.key)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#D85A30", padding: "0 2px" }}>🗑</button>
+                  <input type="number" value={val || ""} placeholder="0"
+                    onChange={e => setSav(c.key, e.target.value)}
+                    style={{ width: 100, textAlign: "right", background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 8px", fontSize: 13, color: "var(--text1)", flexShrink: 0 }} />
+                </div>
+                {/* running balance after this bucket */}
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, marginTop: 3, paddingRight: 2 }}>
+                  <div style={{ flex: 1, height: 1, background: "var(--border)", marginLeft: 14 }} />
+                  <span style={{ fontSize: 11, color: afterThis >= 0 ? "var(--text3)" : "#D85A30", fontWeight: afterThis < 0 ? 600 : 400 }}>
+                    เหลือ {afterThis >= 0 ? "" : "-"}฿{fmt(Math.abs(afterThis))}
+                  </span>
+                </div>
+              </div>
+            );
+          });
+        })()}
+
         {onUpdateSavCats && <AddCatRow onAdd={addCat} placeholder="เช่น ค่าใช้จ่าย, เงินเก็บ, กองทุน..." />}
       </div>
 
