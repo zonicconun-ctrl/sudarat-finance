@@ -2749,8 +2749,8 @@ function CalendarShell({ month, onChange, bonusData, onPrev, onNext, canPrev, ca
   ];
   return (
     <div>
-      {/* Month nav header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px" }}>
+      {/* Month nav header — sticky */}
+      <div style={{ position: "sticky", top: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
         <button onClick={onPrev} disabled={!canPrev} style={{
           width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)",
           background: canPrev ? "var(--bg2)" : "transparent", color: canPrev ? "var(--text1)" : "var(--border)",
